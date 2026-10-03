@@ -89,7 +89,7 @@ La justificación completa de cada exclusión, con su condición de reconsiderac
 ## 5. Épicas del MVP
 
 - **E1. Cuentas y acceso:** agrupa el alta, el inicio y el cierre de sesión y el perfil.
-- **E2. Gestión de tareas:** agrupa crear, asignar, cambiar de estado, poner fecha, corregir y borrar tareas.
+- **E2. Gestión de tareas:** agrupa crear, asignar, cambiar de estado, poner fecha, corregir, borrar y filtrar por estado las tareas.
 - **E3. Actividad del equipo:** agrupa la vista compartida y al día del estado de las tareas: quién está en qué, qué está libre y qué se ha movido, sin refrescar y sin presencia de personas.
 
 "Actividad" se refiere a la actividad del trabajo, es decir, al estado de las tareas, y no a la actividad de las personas.
@@ -118,13 +118,13 @@ Cada requisito indica su épica. "Existente" significa que ya funciona hoy y el 
 - **RF-13.** Una persona puede editar el título, el responsable y la fecha de una tarea. Reasignar una tarea la cambia a otra persona, o la deja libre.
 - **RF-14.** Una persona puede borrar una tarea. **[SUPUESTO]** Se pide confirmación antes de borrar, porque no hay historial ni recuperación.
 - **RF-15 [SUPUESTO].** Cogerse una tarea libre solo asigna el responsable; no cambia su estado. Cambiarlo a "en curso" es una acción aparte (RF-12).
+- **RF-19.** Una persona puede filtrar la lista por estado para centrarse en lo pendiente. Quitar el filtro vuelve a mostrar todas las tareas.
 
 ### E3. Actividad del equipo
 
 - **RF-16.** Todas las personas con sesión ven la misma lista de tareas del equipo.
 - **RF-17.** Cada tarea muestra en la lista su título, su responsable (o "libre"), su estado y su fecha si la tiene, de forma que se vea de un vistazo quién está en qué y qué está libre.
 - **RF-18.** Cuando otra persona crea, edita, mueve de estado o borra una tarea, el cambio aparece en la lista de las demás sin que tengan que recargar la página.
-- **RF-19.** Una persona puede filtrar la lista por estado para centrarse en lo pendiente. Quitar el filtro vuelve a mostrar todas las tareas.
 - **RF-20.** El sistema **no** muestra quién está conectado ni indicadores de actividad de personas, y **no** envía notificaciones push ni emails de aviso.
 - **RF-21 [SUPUESTO].** Las tareas terminadas siguen en la lista, pero la vista por defecto prioriza lo pendiente para que la lista siga siendo corta. El criterio exacto de orden se define antes de implementar.
 
