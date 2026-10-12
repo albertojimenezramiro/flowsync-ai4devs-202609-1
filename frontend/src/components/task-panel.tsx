@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertTriangleIcon } from 'lucide-react'
 import { FieldError } from '@/components/field-error'
 import { Button } from '@/components/ui/button'
@@ -18,11 +18,21 @@ type TaskPanelProps = {
   /** Sustituye la tarea de la lista por la que devuelve el servidor. */
   onTask: (task: Task) => void
   /**
-   * Ejecuta una petición sobre esta tarea con el bloqueo de la fila: como
-   * mucho una en vuelo por tarea, para que ninguna respuesta pise a otra.
+   * Ejecuta una petición sobre esta tarea marcándola como ocupada: mientras
+   * haya alguna en vuelo, los botones de estado de la fila se deshabilitan.
+   * `write` indica que la petición modifica la tarea.
    */
-  withLock: <T>(action: () => Promise<T>) => Promise<T>
+  run: <T>(action: () => Promise<T>, write?: boolean) => Promise<T>
+  /** Número de escrituras lanzadas sobre la tarea; sirve para descartar lecturas viejas. */
+  writeVersion: () => number
+  /** Para errores que llegan con el panel ya cerrado: se avisan en la página. */
+  onError: (message: string) => void
 }
+
+const saveError = (error: unknown) =>
+  error instanceof ApiError
+    ? `No se pudo guardar la fecha. ${error.message}`
+    : 'No se pudo guardar la fecha.'
 
 /**
  * Lo que la lista no enseña de una tarea: su fecha de vencimiento y si está
@@ -33,7 +43,9 @@ export function TaskPanel({
   task,
   token,
   onTask,
-  withLock,
+  run,
+  writeVersion,
+  onError,
 }: TaskPanelProps) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [openError, setOpenError] = useState<string | null>(null)
@@ -42,15 +54,31 @@ export function TaskPanel({
   const [draft, setDraft] = useState(saved)
   const [dateError, setDateError] = useState<string | null>(null)
   const [isSaving, setSaving] = useState(false)
+  const mounted = useRef(true)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+
+  // El campo sigue a la fecha guardada cada vez que el servidor la confirma.
+  useEffect(() => {
+    setDraft(task.dueDate ?? '')
+  }, [task.dueDate])
 
   // Al abrir se pide la tarea: el veredicto de la lista puede ser de ayer.
   useEffect(() => {
     let cancelled = false
-    withLock(() => api.getTask(token, task.id))
+    const issuedAt = writeVersion()
+    run(() => api.getTask(token, task.id))
       .then((fresh) => {
         if (cancelled) return
-        onTask(fresh)
-        setDraft(fresh.dueDate ?? '')
+        // Si mientras tanto se escribió en la tarea, esta lectura es vieja: la
+        // lista ya tiene lo que devolvió esa escritura.
+        if (writeVersion() === issuedAt) onTask(fresh)
         setStatus('ready')
       })
       .catch((error: unknown) => {
@@ -65,7 +93,8 @@ export function TaskPanel({
     return () => {
       cancelled = true
     }
-    // Solo al abrir: las respuestas posteriores llegan por `onTask`.
+    // Solo al abrir (el panel se monta de nuevo en cada apertura): las
+    // respuestas posteriores llegan por `onTask`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -73,24 +102,24 @@ export function TaskPanel({
     setDateError(null)
     setSaving(true)
     try {
-      const updated = await withLock(() =>
-        api.updateTaskDueDate(token, task.id, dueDate),
+      onTask(
+        await run(() => api.updateTaskDueDate(token, task.id, dueDate), true),
       )
-      onTask(updated)
-      setDraft(updated.dueDate ?? '')
+      if (dueDate === null) inputRef.current?.focus()
     } catch (error) {
-      setDraft(saved)
-      if (error instanceof ApiError && error.fieldErrors.dueDate) {
-        setDateError(INVALID_DATE)
-      } else {
-        setDateError(
-          error instanceof ApiError
-            ? `No se pudo guardar la fecha. ${error.message}`
-            : 'No se pudo guardar la fecha.',
-        )
+      if (!mounted.current) {
+        // Se cerró la tarea antes de la respuesta: que el fallo no se pierda.
+        onError(saveError(error))
+        return
       }
+      setDraft(saved)
+      setDateError(
+        error instanceof ApiError && error.fieldErrors.dueDate
+          ? INVALID_DATE
+          : saveError(error),
+      )
     } finally {
-      setSaving(false)
+      if (mounted.current) setSaving(false)
     }
   }
 
@@ -136,11 +165,14 @@ export function TaskPanel({
             <Label htmlFor={`${id}-due-date`}>Fecha de vencimiento</Label>
             <div className="flex flex-wrap items-center gap-2">
               <Input
+                ref={inputRef}
                 id={`${id}-due-date`}
                 type="date"
                 className="w-auto"
                 value={draft}
-                disabled={isSaving}
+                // readOnly y no disabled: deshabilitar quitaría el foco.
+                readOnly={isSaving}
+                aria-busy={isSaving}
                 onChange={(event) => {
                   setDateError(null)
                   setDraft(event.target.value)
@@ -161,6 +193,9 @@ export function TaskPanel({
                   variant="outline"
                   size="sm"
                   disabled={isSaving}
+                  // Sin robar el foco al campo: si no, su blur guardaría el
+                  // borrador y este clic llegaría con el botón deshabilitado.
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => save(null)}
                 >
                   Quitar fecha
@@ -170,12 +205,15 @@ export function TaskPanel({
             <FieldError id={`${id}-error`} message={dateError ?? undefined} />
           </div>
 
-          {task.isOverdue && (
-            <p className="text-destructive flex items-center gap-1.5 text-sm font-medium">
-              <AlertTriangleIcon className="size-4" aria-hidden="true" />
-              Vencida
-            </p>
-          )}
+          {/* Región viva: se anuncia cuando aparece o desaparece «Vencida». */}
+          <div aria-live="polite">
+            {task.isOverdue && (
+              <p className="text-destructive flex items-center gap-1.5 text-sm font-medium">
+                <AlertTriangleIcon className="size-4" aria-hidden="true" />
+                Vencida
+              </p>
+            )}
+          </div>
         </>
       )}
     </div>

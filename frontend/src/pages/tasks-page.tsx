@@ -38,9 +38,13 @@ export function TasksPage() {
   // Último aviso de una acción (crear o cambiar estado): cada acción lo
   // sustituye, así nunca queda visible uno obsoleto tapando al nuevo.
   const [notice, setNotice] = useState<string | null>(null)
-  // Tareas con una petición en vuelo (estado, apertura o fecha): sus controles
-  // se bloquean, así que nunca hay dos respuestas cruzadas sobre la misma.
-  const [savingIds, setSavingIds] = useState<ReadonlySet<number>>(new Set())
+  // Peticiones en vuelo por tarea (estado, apertura o fecha). Es un contador,
+  // no un conjunto: una petición que termina no libera la tarea si quedan otras.
+  const [pending, setPending] = useState<ReadonlyMap<number, number>>(new Map())
+  const isBusy = (id: number) => (pending.get(id) ?? 0) > 0
+  // Escrituras lanzadas por tarea: una lectura emitida antes de la última
+  // escritura se descarta, para que no pise datos más recientes.
+  const writeVersions = useRef(new Map<number, number>())
   // Como mucho una tarea abierta: la lista no debe acabar llena de fechas.
   const [openId, setOpenId] = useState<number | null>(null)
 
@@ -120,21 +124,33 @@ export function TasksPage() {
       current.map((item) => (item.id === task.id ? task : item)),
     )
 
-  const withLock = async <T,>(id: number, action: () => Promise<T>) => {
-    setSavingIds((current) => new Set(current).add(id))
+  const bump = (id: number, delta: number) =>
+    setPending((current) => {
+      const next = new Map(current)
+      const count = (next.get(id) ?? 0) + delta
+      if (count > 0) next.set(id, count)
+      else next.delete(id)
+      return next
+    })
+
+  const run = async <T,>(
+    id: number,
+    action: () => Promise<T>,
+    write = false,
+  ) => {
+    if (write) {
+      writeVersions.current.set(id, (writeVersions.current.get(id) ?? 0) + 1)
+    }
+    bump(id, 1)
     try {
       return await action()
     } finally {
-      setSavingIds((current) => {
-        const next = new Set(current)
-        next.delete(id)
-        return next
-      })
+      bump(id, -1)
     }
   }
 
   const handleStatusChange = async (task: Task, status: TaskStatus) => {
-    if (!token || task.status === status) return
+    if (!token || task.status === status || isBusy(task.id)) return
 
     const previous = task.status
     const setRowStatus = (value: TaskStatus) =>
@@ -149,8 +165,10 @@ export function TasksPage() {
     try {
       // La respuesta trae el veredicto de vencimiento recalculado.
       replaceTask(
-        await withLock(task.id, () =>
-          api.updateTaskStatus(token, task.id, status),
+        await run(
+          task.id,
+          () => api.updateTaskStatus(token, task.id, status),
+          true,
         ),
       )
     } catch (error) {
@@ -259,7 +277,7 @@ export function TasksPage() {
                             task.status === status ? 'default' : 'outline'
                           }
                           aria-pressed={task.status === status}
-                          disabled={savingIds.has(task.id)}
+                          disabled={isBusy(task.id)}
                           onClick={() => handleStatusChange(task, status)}
                         >
                           {STATUS_LABELS[status]}
@@ -270,8 +288,11 @@ export function TasksPage() {
                       type="button"
                       size="sm"
                       variant="ghost"
+                      aria-label={`${openId === task.id ? 'Cerrar' : 'Abrir'} «${task.title}»`}
                       aria-expanded={openId === task.id}
-                      aria-controls={`task-panel-${task.id}`}
+                      aria-controls={
+                        openId === task.id ? `task-panel-${task.id}` : undefined
+                      }
                       onClick={() =>
                         setOpenId((current) =>
                           current === task.id ? null : task.id,
@@ -289,7 +310,11 @@ export function TasksPage() {
                       task={task}
                       token={token}
                       onTask={replaceTask}
-                      withLock={(action) => withLock(task.id, action)}
+                      run={(action, write) => run(task.id, action, write)}
+                      writeVersion={() =>
+                        writeVersions.current.get(task.id) ?? 0
+                      }
+                      onError={setNotice}
                     />
                   )}
                 </li>

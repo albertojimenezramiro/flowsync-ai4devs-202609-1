@@ -3,10 +3,11 @@ import { errors } from '@vinejs/vine'
 import type { HttpContext } from '@adonisjs/core/http'
 
 /**
- * IANA zone *names* only (UTC, Europe/Madrid, Etc/GMT+12...). Luxon alone
- * would also accept fixed offsets such as "+02:00", which the spec rejects.
+ * IANA zone *names* only (UTC, Europe/Madrid, Etc/GMT+12, EST5EDT...). Luxon
+ * alone would also accept fixed offsets such as "+02:00", which the spec
+ * rejects: a name always starts with a letter and never contains ":".
  */
-const ZONE_NAME = /^[A-Za-z]+(?:[/_+-][A-Za-z0-9]+)*$/
+const ZONE_NAME = /^[A-Za-z][A-Za-z0-9_+\-/]*$/
 
 /**
  * The calendar day (YYYY-MM-DD) that counts as "today" for whoever makes the

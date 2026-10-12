@@ -58,7 +58,7 @@ Para la motivación y el alcance, ver proposal.md. Para el contrato, ver `specs/
   - Lee `request.header('x-timezone')` y le quita los espacios.
   - Si falta o está vacía, devuelve `DateTime.utc().toISODate()`.
   - Si no, exige un nombre IANA. Para eso tiene que pasar dos filtros:
-    - la forma `^[A-Za-z]+(?:[/_+-][A-Za-z0-9]+)*$`, que acepta `UTC`, `Europe/Madrid`, `Etc/GMT+12` y `America/Argentina/Buenos_Aires`, y rechaza `+02:00` o `UTC+3`;
+    - la forma `^[A-Za-z][A-Za-z0-9_+\-/]*$`: un nombre empieza por letra y nunca lleva `:`. Acepta `UTC`, `Europe/Madrid`, `Etc/GMT+12`, `America/Argentina/Buenos_Aires` y también `EST5EDT` o `GMT0`, que el navegador puede devolver. Rechaza `+02:00`. Una versión anterior, más estricta, rechazaba `EST5EDT`; lo detectó la revisión de la implementación;
     - `IANAZone.isValidZone(tz)`, porque luxon por sí solo aceptaría desfases como `+02:00`.
   - Si no pasa, lanza `errors.E_VALIDATION_ERROR([{ field: 'X-Timezone', rule: 'timezone', message: 'The X-Timezone header must be a valid IANA time zone name' }])`, que da `422` con la forma habitual `{ errors }`.
   - Si es válida, devuelve `DateTime.now().setZone(tz).toISODate()`.
@@ -122,10 +122,18 @@ Para la motivación y el alcance, ver proposal.md. Para el contrato, ver `specs/
       - En cualquier otro caso (vacío, `validity.badInput` o año de cinco cifras), se muestra «Introduce una fecha completa y válida.» y `draft` vuelve a la fecha guardada. Vaciar el campo no quita la fecha: eso solo se hace con «Quitar fecha».
     - «Quitar fecha» envía `null` sin confirmación.
     - **Sin optimismo para la fecha**: se espera la respuesta, porque el veredicto debe venir del servidor. Si falla, `draft` vuelve a la fecha guardada y se muestra el error.
-- **Un único bloqueo por tarea**:
-  - El conjunto `savingIds` que ya bloquea los botones de estado durante un `PATCH` se amplía a toda petición sobre esa tarea: la carga del panel, el guardado de la fecha y el cambio de estado.
-  - Mientras dure, se deshabilitan los botones de estado de la fila y «Quitar fecha». El input solo se deshabilita mientras se guarda la fecha, nunca mientras se escribe.
-  - Al haber como mucho una petición en vuelo por tarea, una respuesta nunca pisa a otra más reciente, y la tarea puede reemplazarse entera con lo que devuelva el servidor.
+- **Peticiones en vuelo y lecturas viejas** (ajustado tras la revisión de la implementación):
+  - Un **contador por tarea** (`pending: Map<id, n>`) sustituye al antiguo conjunto `savingIds`. Cuenta toda petición sobre la tarea: la carga del panel, el guardado de la fecha y el cambio de estado.
+    - Mientras haya alguna, se deshabilitan los botones de estado de la fila y «Quitar fecha».
+    - `handleStatusChange` también lo comprueba antes de lanzar nada.
+    - Con un conjunto, la primera petición en terminar liberaba la tarea aunque quedaran otras.
+  - Un **número de versión de escritura por tarea**, que se incrementa con cada `PATCH`.
+    - La lectura del panel guarda la versión al emitirse y descarta su respuesta si entretanto hubo una escritura. Así un `GET` lento, por ejemplo al cerrar y reabrir o con el doble efecto de StrictMode, no pisa un estado o una fecha más recientes.
+    - Las escrituras se reemplazan con su propia respuesta.
+  - Mientras se guarda, el input es `readOnly` (no `disabled`), para no perder el foco del teclado. Tras «Quitar fecha», el foco vuelve al campo.
+  - «Quitar fecha» hace `preventDefault` en `mousedown`. Así no roba el foco al campo, el blur no guarda un borrador editado y el clic no llega con el botón ya deshabilitado.
+  - Si un guardado falla con el panel ya cerrado, por ejemplo al escribir una fecha y pulsar «Cerrar» con la red caída, el error se muestra en el aviso de la página para que no se pierda.
+  - «Vencida» vive dentro de una región `aria-live="polite"`, que la anuncia al aparecer y al desaparecer. El botón «Abrir» / «Cerrar» lleva `aria-label` con el título de la tarea.
 - **Cambio de estado desde la fila**:
   - Sigue siendo optimista.
   - Al recibir la respuesta del `PATCH`, reemplaza la tarea con la del servidor. Así, el «Vencida» del panel abierto se actualiza al pasar a «Hecho» o al volver.

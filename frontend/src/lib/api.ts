@@ -44,6 +44,7 @@ const FIELD_LABELS: Record<string, string> = {
   passwordConfirmation: 'la confirmación de la contraseña',
   title: 'el título',
   dueDate: 'la fecha de vencimiento',
+  'X-Timezone': 'la zona horaria del navegador',
 }
 
 const label = (field?: string) => FIELD_LABELS[field ?? ''] ?? 'el campo'
