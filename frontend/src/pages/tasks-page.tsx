@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { AlertCircleIcon } from 'lucide-react'
 import { useAuth } from '@/auth/use-auth'
 import { FieldError } from '@/components/field-error'
+import { TaskPanel } from '@/components/task-panel'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
@@ -37,8 +38,15 @@ export function TasksPage() {
   // Último aviso de una acción (crear o cambiar estado): cada acción lo
   // sustituye, así nunca queda visible uno obsoleto tapando al nuevo.
   const [notice, setNotice] = useState<string | null>(null)
-  // Filas con un cambio de estado en vuelo: sus botones se bloquean.
-  const [savingIds, setSavingIds] = useState<ReadonlySet<number>>(new Set())
+  // Peticiones en vuelo por tarea (estado, apertura o fecha). Es un contador,
+  // no un conjunto: una petición que termina no libera la tarea si quedan otras.
+  const [pending, setPending] = useState<ReadonlyMap<number, number>>(new Map())
+  const isBusy = (id: number) => (pending.get(id) ?? 0) > 0
+  // Escrituras lanzadas por tarea: una lectura emitida antes de la última
+  // escritura se descarta, para que no pise datos más recientes.
+  const writeVersions = useRef(new Map<number, number>())
+  // Como mucho una tarea abierta: la lista no debe acabar llena de fechas.
+  const [openId, setOpenId] = useState<number | null>(null)
 
   const [title, setTitle] = useState('')
   const [titleError, setTitleError] = useState<string | null>(null)
@@ -111,8 +119,38 @@ export function TasksPage() {
     }
   }
 
+  const replaceTask = (task: Task) =>
+    setTasks((current) =>
+      current.map((item) => (item.id === task.id ? task : item)),
+    )
+
+  const bump = (id: number, delta: number) =>
+    setPending((current) => {
+      const next = new Map(current)
+      const count = (next.get(id) ?? 0) + delta
+      if (count > 0) next.set(id, count)
+      else next.delete(id)
+      return next
+    })
+
+  const run = async <T,>(
+    id: number,
+    action: () => Promise<T>,
+    write = false,
+  ) => {
+    if (write) {
+      writeVersions.current.set(id, (writeVersions.current.get(id) ?? 0) + 1)
+    }
+    bump(id, 1)
+    try {
+      return await action()
+    } finally {
+      bump(id, -1)
+    }
+  }
+
   const handleStatusChange = async (task: Task, status: TaskStatus) => {
-    if (!token || task.status === status) return
+    if (!token || task.status === status || isBusy(task.id)) return
 
     const previous = task.status
     const setRowStatus = (value: TaskStatus) =>
@@ -124,9 +162,15 @@ export function TasksPage() {
 
     setNotice(null)
     setRowStatus(status)
-    setSavingIds((current) => new Set(current).add(task.id))
     try {
-      await api.updateTaskStatus(token, task.id, status)
+      // La respuesta trae el veredicto de vencimiento recalculado.
+      replaceTask(
+        await run(
+          task.id,
+          () => api.updateTaskStatus(token, task.id, status),
+          true,
+        ),
+      )
     } catch (error) {
       setRowStatus(previous)
       setNotice(
@@ -134,12 +178,6 @@ export function TasksPage() {
           ? `${STATUS_ERROR} ${error.message}`
           : STATUS_ERROR,
       )
-    } finally {
-      setSavingIds((current) => {
-        const next = new Set(current)
-        next.delete(task.id)
-        return next
-      })
     }
   }
 
@@ -217,35 +255,68 @@ export function TasksPage() {
           ) : (
             <ul className="divide-y">
               {tasks.map((task) => (
-                <li
-                  key={task.id}
-                  className="flex flex-wrap items-center justify-between gap-3 py-3"
-                >
-                  <div className="min-w-0">
-                    <p className="font-medium break-words">{task.title}</p>
-                    <p className="text-muted-foreground text-sm">
-                      {task.assignee.fullName?.trim() || 'Sin nombre'}
-                    </p>
+                <li key={task.id} className="py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium break-words">{task.title}</p>
+                      <p className="text-muted-foreground text-sm">
+                        {task.assignee.fullName?.trim() || 'Sin nombre'}
+                      </p>
+                    </div>
+                    <div
+                      className="flex gap-1"
+                      role="group"
+                      aria-label={`Estado de «${task.title}»`}
+                    >
+                      {TASK_STATUSES.map((status) => (
+                        <Button
+                          key={status}
+                          type="button"
+                          size="sm"
+                          variant={
+                            task.status === status ? 'default' : 'outline'
+                          }
+                          aria-pressed={task.status === status}
+                          disabled={isBusy(task.id)}
+                          onClick={() => handleStatusChange(task, status)}
+                        >
+                          {STATUS_LABELS[status]}
+                        </Button>
+                      ))}
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`${openId === task.id ? 'Cerrar' : 'Abrir'} «${task.title}»`}
+                      aria-expanded={openId === task.id}
+                      aria-controls={
+                        openId === task.id ? `task-panel-${task.id}` : undefined
+                      }
+                      onClick={() =>
+                        setOpenId((current) =>
+                          current === task.id ? null : task.id,
+                        )
+                      }
+                    >
+                      {openId === task.id ? 'Cerrar' : 'Abrir'}
+                    </Button>
                   </div>
-                  <div
-                    className="flex gap-1"
-                    role="group"
-                    aria-label={`Estado de «${task.title}»`}
-                  >
-                    {TASK_STATUSES.map((status) => (
-                      <Button
-                        key={status}
-                        type="button"
-                        size="sm"
-                        variant={task.status === status ? 'default' : 'outline'}
-                        aria-pressed={task.status === status}
-                        disabled={savingIds.has(task.id)}
-                        onClick={() => handleStatusChange(task, status)}
-                      >
-                        {STATUS_LABELS[status]}
-                      </Button>
-                    ))}
-                  </div>
+                  {/* Se desmonta al cerrar: con la tarea cerrada no queda
+                      ninguna fecha ni marca de vencida en la página. */}
+                  {openId === task.id && token && (
+                    <TaskPanel
+                      id={`task-panel-${task.id}`}
+                      task={task}
+                      token={token}
+                      onTask={replaceTask}
+                      run={(action, write) => run(task.id, action, write)}
+                      writeVersion={() =>
+                        writeVersions.current.get(task.id) ?? 0
+                      }
+                      onError={setNotice}
+                    />
+                  )}
                 </li>
               ))}
             </ul>

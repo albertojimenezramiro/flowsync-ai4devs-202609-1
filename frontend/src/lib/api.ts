@@ -43,6 +43,8 @@ const FIELD_LABELS: Record<string, string> = {
   password: 'la contraseña',
   passwordConfirmation: 'la confirmación de la contraseña',
   title: 'el título',
+  dueDate: 'la fecha de vencimiento',
+  'X-Timezone': 'la zona horaria del navegador',
 }
 
 const label = (field?: string) => FIELD_LABELS[field ?? ''] ?? 'el campo'
@@ -122,6 +124,8 @@ async function request<T>(
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   if (token) headers.Authorization = `Bearer ${token}`
+  // El servidor decide si una tarea está vencida según el día de quien mira.
+  headers['X-Timezone'] = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   let response: Response
   try {
@@ -195,6 +199,25 @@ export function updateTaskStatus(
   return request<{ data: Task }>(`/api/v1/tasks/${id}`, {
     method: 'PATCH',
     body: { status },
+    token,
+  }).then((response) => response.data)
+}
+
+export function getTask(token: string, id: number): Promise<Task> {
+  return request<{ data: Task }>(`/api/v1/tasks/${id}`, { token }).then(
+    (response) => response.data,
+  )
+}
+
+/** `null` quita la fecha. */
+export function updateTaskDueDate(
+  token: string,
+  id: number,
+  dueDate: string | null,
+): Promise<Task> {
+  return request<{ data: Task }>(`/api/v1/tasks/${id}`, {
+    method: 'PATCH',
+    body: { dueDate },
     token,
   }).then((response) => response.data)
 }
