@@ -9,12 +9,16 @@ La aplicación web SHALL ofrecer las pantallas de inicio de sesión (`/login`), 
 - **WHEN** una persona sin sesión abre `/profile`
 - **THEN** se la lleva a la pantalla de inicio de sesión
 
+#### Scenario: Visitante sin sesión entra a la lista de tareas
+- **WHEN** una persona sin sesión abre `/tasks`
+- **THEN** se la lleva a la pantalla de inicio de sesión
+
 #### Scenario: Persona con sesión entra a login o registro
 - **WHEN** una persona con sesión abre `/login` o `/register`
 - **THEN** se la lleva a la lista de tareas
 
 #### Scenario: Dirección desconocida
-- **WHEN** se abre una dirección que no es ninguna de las tres pantallas
+- **WHEN** se abre una dirección que no es ninguna de las cuatro pantallas
 - **THEN** se redirige a la lista de tareas, y de ahí al login si no hay sesión
 
 ### Requirement: Pantalla de inicio de sesión

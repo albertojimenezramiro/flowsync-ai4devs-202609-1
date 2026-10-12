@@ -97,7 +97,7 @@ El título SHALL recortarse de espacios al principio y al final antes de validar
 - **THEN** la respuesta es `422` con un error sobre `title` y no se guarda ninguna versión recortada
 
 ### Requirement: Actualización de estado y responsable
-El sistema SHALL aceptar `PATCH /api/v1/tasks/:id`, con `:id` entero, y con `status`, `assigneeId` (entero positivo, sin conversión desde otros tipos) o ambos, aplicar solo los campos enviados y responder `200` con `{ data: task }` actualizada. Cualquier persona con sesión SHALL poder actualizar cualquier tarea. Las transiciones entre los tres estados SHALL ser libres. Otros campos, incluido `title`, SHALL ignorarse.
+El sistema SHALL aceptar `PATCH /api/v1/tasks/:id`, con `:id` entero positivo escrito en forma canónica (sin ceros a la izquierda), y con `status`, `assigneeId` (entero positivo, sin conversión desde otros tipos) o ambos, aplicar solo los campos enviados y responder `200` con `{ data: task }` actualizada. Cualquier persona con sesión SHALL poder actualizar cualquier tarea. Las transiciones entre los tres estados SHALL ser libres. Otros campos, incluido `title`, SHALL ignorarse.
 
 #### Scenario: Cambio de estado
 - **WHEN** se envía `{ "status": "in_progress" }` sobre una tarea en `pending`
@@ -120,7 +120,7 @@ El sistema SHALL aceptar `PATCH /api/v1/tasks/:id`, con `:id` entero, y con `sta
 - **THEN** la respuesta es `422` con un error sobre `assigneeId` y la tarea no cambia
 
 #### Scenario: Responsable con tipo incorrecto
-- **WHEN** se envía `assigneeId` como cadena (`"7"`), booleano, lista o número con decimales
+- **WHEN** se envía `assigneeId` como cadena (`"7"`), booleano, lista, cero o número no entero (por ejemplo `1.5`). Un número JSON con valor entero, como `7.0` o `7e0`, es el entero 7 y se acepta
 - **THEN** la respuesta es `422` con un error sobre `assigneeId` y la tarea no cambia, aunque exista una cuenta con ese id
 
 #### Scenario: Responsable nulo
@@ -140,7 +140,7 @@ El sistema SHALL aceptar `PATCH /api/v1/tasks/:id`, con `:id` entero, y con `sta
 - **THEN** la respuesta es `404`
 
 #### Scenario: Identificador no entero
-- **WHEN** se actualiza `/api/v1/tasks/1.0` o `/api/v1/tasks/abc`
+- **WHEN** se actualiza `/api/v1/tasks/1.0`, `/api/v1/tasks/01` o `/api/v1/tasks/abc`
 - **THEN** la respuesta es `404` y ninguna tarea cambia, aunque exista la tarea 1
 
 ### Requirement: Superficie cerrada de la API de tareas

@@ -39,7 +39,10 @@ router
       .group(() => {
         router.get('/', [controllers.Tasks, 'index'])
         router.post('/', [controllers.Tasks, 'store'])
-        router.patch(':id', [controllers.Tasks, 'update']).where('id', router.matchers.number())
+        router
+          .patch(':id', [controllers.Tasks, 'update'])
+          // Canonical positive integers only: rejects 1.0, -1 and leading zeros (01).
+          .where('id', { match: /^[1-9]\d*$/, cast: (value) => Number(value) })
       })
       .prefix('tasks')
       .use(middleware.auth())

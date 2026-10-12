@@ -53,7 +53,7 @@ Para la motivación y el alcance, ver proposal.md. Para el contrato, ver `specs/
 - **Rutas**: un grupo `tasks` bajo `/api/v1` con `.use(middleware.auth())`. Contiene exactamente tres rutas:
   - `GET /tasks` → `TasksController.index`.
   - `POST /tasks` → `TasksController.store`.
-  - `PATCH /tasks/:id` → `TasksController.update`, con `.where('id', router.matchers.number())`. Sin el matcher, `/tasks/1.0` llegaba a `findOrFail` y SQLite lo convertía en `1`, de modo que una URL distinta modificaba la tarea 1. Con el matcher, todo `:id` no entero da `404` de ruta.
+  - `PATCH /tasks/:id` → `TasksController.update`, con `.where('id', { match: /^[1-9]\d*$/, cast: Number })`. Sin el matcher, `/tasks/1.0` llegaba a `findOrFail` y SQLite lo convertía en `1`, de modo que una URL distinta modificaba la tarea 1. `router.matchers.number()` (`^\d+$`) no basta, porque deja pasar `/tasks/01`. Con el matcher, solo la forma canónica de un entero positivo llega al controlador; el resto da `404` de ruta.
 - No se usa `router.resource`, que generaría `show` y `destroy`. Se declaran las tres rutas a mano para que la superficie cerrada sea explícita.
 - **index**: `Task.query().preload('assignee')`, **sin `orderBy`**. Es una decisión consciente por PA-3: el orden queda indefinido, sin inventar un criterio. Se documenta en el propio código con un comentario que remite a PA-3.
 - **store**:
