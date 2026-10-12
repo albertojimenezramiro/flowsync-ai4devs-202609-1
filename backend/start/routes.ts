@@ -33,5 +33,15 @@ router
       .prefix('account')
       .as('profile')
       .use(middleware.auth())
+
+    // Exactamente tres operaciones: sin lectura individual ni borrado.
+    router
+      .group(() => {
+        router.get('/', [controllers.Tasks, 'index'])
+        router.post('/', [controllers.Tasks, 'store'])
+        router.patch(':id', [controllers.Tasks, 'update'])
+      })
+      .prefix('tasks')
+      .use(middleware.auth())
   })
   .prefix('/api/v1')
