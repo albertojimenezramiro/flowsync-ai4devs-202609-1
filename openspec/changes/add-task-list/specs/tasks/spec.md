@@ -22,11 +22,15 @@ Toda tarea que devuelva la API SHALL exponer exactamente `id`, `title`, `status`
 - **THEN** la respuesta no contiene ningún campo de fecha de vencimiento
 
 ### Requirement: Conjunto cerrado de estados
-El estado de una tarea SHALL ser siempre uno de `pending`, `in_progress` o `done`. La API SHALL rechazar con `422` cualquier otro valor, incluidos los nombres en castellano. No SHALL existir forma de añadir, renombrar ni eliminar estados.
+El estado de una tarea SHALL ser siempre uno de `pending`, `in_progress` o `done`. La API SHALL rechazar con `422` cualquier otro valor, incluidos los nombres en castellano, `null` y la cadena vacía. No SHALL existir forma de añadir, renombrar ni eliminar estados.
 
 #### Scenario: Valor fuera del conjunto
 - **WHEN** se intenta poner a una tarea el estado `blocked`
 - **THEN** la respuesta es `422` con un error sobre `status` y la tarea conserva su estado anterior
+
+#### Scenario: Estado nulo o vacío junto a otro cambio válido
+- **WHEN** se envía `{ "status": null, "assigneeId": <id válido> }` o `{ "status": "", "assigneeId": <id válido> }`
+- **THEN** la respuesta es `422` con un error sobre `status` y la tarea no cambia en nada
 
 #### Scenario: Nombre en castellano como valor
 - **WHEN** se intenta poner a una tarea el estado `Hecho` o `hecho`
@@ -70,7 +74,7 @@ El sistema SHALL aceptar `POST /api/v1/tasks` con `title` como único dato y res
 - **THEN** la tarea nueva forma parte de la lista
 
 ### Requirement: Título obligatorio y acotado
-El título SHALL recortarse de espacios al principio y al final antes de validarse y guardarse. Si queda vacío, o falta, la API SHALL responder `422` con un error sobre `title` y no crear nada. Si tras recortarlo supera 120 caracteres, SHALL responder `422` con un error sobre `title`. El título SHALL NOT guardarse nunca recortado por longitud.
+El título SHALL recortarse de espacios al principio y al final antes de validarse y guardarse. Si queda vacío, o falta, la API SHALL responder `422` con un error sobre `title` y no crear nada. Si tras recortarlo supera 120 caracteres (contados como unidades de texto UTF-16, de modo que algunos emojis cuentan como dos), SHALL responder `422` con un error sobre `title`. El título SHALL NOT guardarse nunca recortado por longitud.
 
 #### Scenario: Sin título
 - **WHEN** se intenta crear una tarea sin `title` o con `title` vacío
@@ -115,6 +119,10 @@ El sistema SHALL aceptar `PATCH /api/v1/tasks/:id` con `status`, `assigneeId` o 
 - **WHEN** se envía un `assigneeId` que no corresponde a ninguna cuenta
 - **THEN** la respuesta es `422` con un error sobre `assigneeId` y la tarea no cambia
 
+#### Scenario: Responsable nulo
+- **WHEN** se envía `{ "status": "done", "assigneeId": null }`
+- **THEN** la respuesta es `422` con un error sobre `assigneeId` y la tarea no cambia en nada
+
 #### Scenario: Nada que actualizar
 - **WHEN** se envía un cuerpo sin `status` ni `assigneeId`
 - **THEN** la respuesta es `422` y la tarea no cambia
@@ -154,7 +162,7 @@ La aplicación web SHALL ofrecer la lista de tareas en `/tasks`, solo con sesió
 - **THEN** tiene un enlace visible para ir a la otra pantalla
 
 ### Requirement: Cada fila dice título, responsable y estado
-La lista SHALL mostrar en cada fila el título de la tarea, el nombre de su responsable y su estado como «Pendiente», «En curso» o «Hecho», sin abrir nada. Si el responsable no tiene nombre SHALL mostrarse «Sin nombre»; nunca su email ni su identificador. La lista SHALL NOT mostrar fechas, marcas de vencida ni señales de presencia de otras personas.
+La lista SHALL mostrar en cada fila el título de la tarea, el nombre de su responsable y su estado como «Pendiente», «En curso» o «Hecho», sin abrir nada. Si el responsable no tiene nombre, o su nombre está formado solo por espacios, SHALL mostrarse «Sin nombre»; nunca su email ni su identificador. La lista SHALL NOT mostrar fechas, marcas de vencida ni señales de presencia de otras personas.
 
 #### Scenario: Fila completa
 - **WHEN** hay una tarea «Preparar la demo» en `in_progress` a cargo de «Ada Lovelace»
@@ -163,6 +171,10 @@ La lista SHALL mostrar en cada fila el título de la tarea, el nombre de su resp
 #### Scenario: Responsable sin nombre
 - **WHEN** el responsable de una tarea se registró sin nombre
 - **THEN** su fila muestra «Sin nombre» como responsable, y no su email
+
+#### Scenario: Responsable con nombre en blanco
+- **WHEN** el responsable de una tarea tiene como nombre solo espacios
+- **THEN** su fila muestra «Sin nombre» como responsable
 
 #### Scenario: Ni fechas ni presencia
 - **WHEN** una persona recorre la lista mientras otras usan la aplicación
@@ -176,7 +188,7 @@ Cuando no exista ninguna tarea, la pantalla SHALL explicar qué es la lista y SH
 - **THEN** ve un mensaje que explica que aquí está el trabajo de todo el equipo y la anima a crear la primera, junto al formulario para hacerlo
 
 ### Requirement: Crear tarea desde la lista con solo el título
-La pantalla de lista SHALL ofrecer un formulario con un único campo de título y un botón para crear. No SHALL pedir ni sugerir responsable, estado, fecha ni ningún otro dato. Al crearse, la tarea SHALL aparecer en la lista sin recargar ni navegar, y el campo SHALL vaciarse. Mientras se envía, el botón SHALL estar deshabilitado.
+La pantalla de lista SHALL ofrecer un formulario con un único campo de título y un botón para crear. No SHALL pedir ni sugerir responsable, estado, fecha ni ningún otro dato. Al crearse, la tarea SHALL aparecer en la lista sin recargar ni navegar, y el campo SHALL vaciarse. Mientras se envía, y mientras la lista aún se está cargando, el botón SHALL estar deshabilitado.
 
 #### Scenario: Crear con un título
 - **WHEN** la persona escribe un título y pulsa el botón de crear
@@ -198,7 +210,7 @@ La pantalla SHALL explicar en lenguaje corriente, junto al campo, por qué no se
 - **THEN** ve «El título no puede superar los 120 caracteres.» junto al campo, su texto sigue íntegro en el campo y no se crea nada
 
 ### Requirement: Cambiar el estado desde la fila
-Cada fila SHALL permitir cambiar el estado de su tarea con un solo gesto, sin abrirla, sin diálogo de confirmación y sin rellenar ningún campo. Los únicos destinos ofrecidos SHALL ser «Pendiente», «En curso» y «Hecho», con el actual marcado. El nuevo estado SHALL reflejarse de inmediato. Si el servidor rechaza el cambio, la fila SHALL volver a su estado anterior y mostrarse un aviso.
+Cada fila SHALL permitir cambiar el estado de su tarea con un solo gesto, sin abrirla, sin diálogo de confirmación y sin rellenar ningún campo. Los únicos destinos ofrecidos SHALL ser «Pendiente», «En curso» y «Hecho», con el actual marcado. El nuevo estado SHALL reflejarse de inmediato. Si el servidor rechaza el cambio, la fila SHALL volver a su estado anterior y mostrarse un aviso que empiece por «No se pudo guardar el cambio de estado.» seguido del motivo.
 
 #### Scenario: Cambio desde la lista
 - **WHEN** la persona elige «En curso» en una tarea que está en «Pendiente»
@@ -214,7 +226,7 @@ Cada fila SHALL permitir cambiar el estado de su tarea con un solo gesto, sin ab
 
 #### Scenario: El servidor rechaza el cambio
 - **WHEN** el cambio de estado falla en el servidor o no hay conexión
-- **THEN** la fila vuelve a mostrar el estado que tenía y la persona ve un aviso explicando que no se pudo guardar
+- **THEN** la fila vuelve a mostrar el estado que tenía y la persona ve «No se pudo guardar el cambio de estado.» seguido del motivo (por ejemplo, que no se pudo conectar con el servidor)
 
 ### Requirement: Mirar la lista no cambia nada
 Abrir y recorrer la lista SHALL NOT cambiar el estado ni el responsable de ninguna tarea.

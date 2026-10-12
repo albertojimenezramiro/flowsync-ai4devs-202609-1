@@ -55,7 +55,8 @@ FlowSync solo sabe registrar personas e iniciar sesión: todavía no existe ni u
   - Enlaces de navegación entre lista y perfil.
   - Se reutilizan los componentes de `src/components/ui/` (button, card, input, label, alert). No hay dependencias nuevas.
 - **Puntos abiertos (PRD)**:
-  - **PA-3, orden de la lista.** No hay regla decidida, así que no se ordena explícitamente: la lista sale en el orden en que la devuelve la base de datos, sin garantía. Queda pendiente decidir orden y agrupación.
+  - **PA-3, orden de la lista.** No hay regla decidida, así que no se ordena explícitamente: la lista sale en el orden en que la devuelve la base de datos, sin garantía. Queda pendiente decidir orden y agrupación. **Consecuencia aceptada:** E3-1 CA-5 («enumerar en qué trabaja cada miembro sin hacer clic») queda **sin cubrir** en este change; la propia historia advierte que no se sostiene sin orden ni agrupación.
+  - **PA-4, «En curso» por persona.** Cuántas tareas puede acumular alguien en curso queda sin decidir; no se limita.
   - **PA-7, transiciones.** Se dejan libres entre los tres estados, incluida la vuelta atrás desde Hecho. Falta confirmar si basta para deshacer errores.
   - **PA-9, longitud del título.** Se fija provisionalmente en 120 caracteres para poder rechazar en vez de recortar. Falta validarlo como decisión de producto.
   - **PA-8.** Qué ve alguien cuando una tarea cambia bajo sus pies. No aplica todavía: no hay vista de detalle ni refresco automático.
