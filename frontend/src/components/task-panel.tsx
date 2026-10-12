@@ -10,6 +10,8 @@ import type { Task } from '@/lib/types'
 
 const FULL_DATE = /^\d{4}-\d{2}-\d{2}$/
 const INVALID_DATE = 'Introduce una fecha completa y válida.'
+const DISCARDED_ON_CLOSE =
+  'No se guardó la fecha porque había otro cambio guardándose. Ábrela y vuelve a ponerla.'
 const WAIT_FOR_SAVE =
   'Hay otro cambio guardándose. Espera a que termine y vuelve a intentarlo.'
 
@@ -76,15 +78,27 @@ export function TaskPanel({
   // Fecha que este panel está guardando ahora mismo (null si ninguna): una
   // segunda confirmación de esa misma fecha no es un conflicto.
   const sendingRef = useRef<string | null>(null)
+  // Se descartó una fecha válida por haber otra escritura en curso. Si el panel
+  // se cierra así (el aviso del panel muere con él), se avisa en la página.
+  const discardedRef = useRef(false)
   useEffect(() => {
     savedRef.current = saved
   }, [saved])
+
+  // Solo se avisa al cerrar si el conflicto sigue vivo: cuando termina la
+  // escritura que causó el descarte, el aviso del panel ya lo explicó.
+  useEffect(() => {
+    if (!writing) discardedRef.current = false
+  }, [writing])
 
   useEffect(() => {
     mounted.current = true
     return () => {
       mounted.current = false
+      if (discardedRef.current) onError(DISCARDED_ON_CLOSE)
     }
+    // `onError` es estable (el setter de la página).
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // El campo sigue a la fecha guardada cada vez que el servidor la confirma.
@@ -133,6 +147,9 @@ export function TaskPanel({
     // Guarda síncrona: con una escritura en vuelo sobre la tarea (fecha o
     // estado) no se lanza otra. Cubre también «Quitar fecha».
     if (isWriting()) return
+    // Cualquier guardado, incluido «Quitar fecha», sustituye a la fecha
+    // descartada: ya no hay nada pendiente de avisar.
+    discardedRef.current = false
     setDateError(null)
     sendingRef.current = dueDate
     setSaving(true)
@@ -177,6 +194,9 @@ export function TaskPanel({
       // Intro y luego salir del campo: es la misma fecha que ya se envía.
       if (!input.validity.badInput && draft === sendingRef.current) return
       if (input.validity.badInput || draft !== savedRef.current) {
+        // Solo una fecha completa y válida cuenta como perdida: las
+        // incompletas se descartan en silencio al cerrar.
+        discardedRef.current = !input.validity.badInput && FULL_DATE.test(draft)
         setDateError(WAIT_FOR_SAVE)
         setDraft(savedRef.current)
         input.value = savedRef.current
@@ -187,6 +207,7 @@ export function TaskPanel({
     if (!incomplete && draft === savedRef.current) return
 
     if (!incomplete && FULL_DATE.test(draft)) {
+      discardedRef.current = false
       void save(draft)
       return
     }
@@ -231,6 +252,7 @@ export function TaskPanel({
                 readOnly={isSaving || busy}
                 aria-busy={isSaving}
                 onChange={(event) => {
+                  discardedRef.current = false
                   setDateError(null)
                   setDraft(event.target.value)
                 }}
