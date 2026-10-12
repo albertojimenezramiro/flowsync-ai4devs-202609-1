@@ -15,7 +15,9 @@ export const createTaskValidator = vine.create({
 export const updateTaskValidator = vine.create({
   status: vine.enum(TASK_STATUSES).optional().requiredIfMissing('assigneeId'),
   assigneeId: vine
-    .number()
+    .number({ strict: true })
+    .withoutDecimals()
+    .positive()
     .exists({ table: 'users', column: 'id' })
     .optional()
     .requiredIfMissing('status'),

@@ -39,7 +39,7 @@ router
       .group(() => {
         router.get('/', [controllers.Tasks, 'index'])
         router.post('/', [controllers.Tasks, 'store'])
-        router.patch(':id', [controllers.Tasks, 'update'])
+        router.patch(':id', [controllers.Tasks, 'update']).where('id', router.matchers.number())
       })
       .prefix('tasks')
       .use(middleware.auth())

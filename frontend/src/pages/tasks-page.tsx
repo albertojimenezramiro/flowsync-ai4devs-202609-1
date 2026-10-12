@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { AlertCircleIcon } from 'lucide-react'
 import { useAuth } from '@/auth/use-auth'
@@ -34,14 +34,18 @@ export function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [isLoading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [statusError, setStatusError] = useState<string | null>(null)
+  // Último aviso de una acción (crear o cambiar estado): cada acción lo
+  // sustituye, así nunca queda visible uno obsoleto tapando al nuevo.
+  const [notice, setNotice] = useState<string | null>(null)
   // Filas con un cambio de estado en vuelo: sus botones se bloquean.
   const [savingIds, setSavingIds] = useState<ReadonlySet<number>>(new Set())
 
   const [title, setTitle] = useState('')
   const [titleError, setTitleError] = useState<string | null>(null)
-  const [createError, setCreateError] = useState<string | null>(null)
   const [isCreating, setCreating] = useState(false)
+  // Guarda síncrona contra el doble envío: el estado no se refleja hasta el
+  // siguiente render.
+  const creatingRef = useRef(false)
 
   useEffect(() => {
     if (!token) return
@@ -70,7 +74,7 @@ export function TasksPage() {
 
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (!token) return
+    if (!token || creatingRef.current) return
 
     // Validación local: no se gasta una petición en un despiste evidente y,
     // sobre todo, nunca se recorta el texto en silencio.
@@ -87,7 +91,8 @@ export function TasksPage() {
     }
 
     setTitleError(null)
-    setCreateError(null)
+    setNotice(null)
+    creatingRef.current = true
     setCreating(true)
     try {
       const task = await api.createTask(token, trimmed)
@@ -98,11 +103,10 @@ export function TasksPage() {
       if (error instanceof ApiError && error.fieldErrors.title) {
         setTitleError(error.fieldErrors.title)
       } else {
-        setCreateError(
-          errorMessage(error, 'Algo ha ido mal. Inténtalo de nuevo.'),
-        )
+        setNotice(errorMessage(error, 'Algo ha ido mal. Inténtalo de nuevo.'))
       }
     } finally {
+      creatingRef.current = false
       setCreating(false)
     }
   }
@@ -118,14 +122,14 @@ export function TasksPage() {
         ),
       )
 
-    setStatusError(null)
+    setNotice(null)
     setRowStatus(status)
     setSavingIds((current) => new Set(current).add(task.id))
     try {
       await api.updateTaskStatus(token, task.id, status)
     } catch (error) {
       setRowStatus(previous)
-      setStatusError(
+      setNotice(
         error instanceof ApiError
           ? `${STATUS_ERROR} ${error.message}`
           : STATUS_ERROR,
@@ -174,19 +178,20 @@ export function TasksPage() {
                 aria-invalid={Boolean(titleError)}
                 aria-describedby={titleError ? 'title-error' : undefined}
               />
-              <Button type="submit" disabled={isCreating || isLoading}>
+              <Button
+                type="submit"
+                disabled={isCreating || isLoading || Boolean(loadError)}
+              >
                 {isCreating ? 'Creando…' : 'Crear tarea'}
               </Button>
             </div>
             <FieldError id="title-error" message={titleError ?? undefined} />
           </form>
 
-          {(createError || statusError || loadError) && (
+          {(notice || loadError) && (
             <Alert variant="destructive">
               <AlertCircleIcon />
-              <AlertDescription>
-                {createError ?? statusError ?? loadError}
-              </AlertDescription>
+              <AlertDescription>{loadError ?? notice}</AlertDescription>
             </Alert>
           )}
 
