@@ -4,7 +4,7 @@
 
 - [x] 1.1 Crear la migración de `tasks` con estas columnas: `id`; `title` (string 120, no nulo); `status` (string, no nulo, por defecto `'pending'`); `assignee_id` (FK a `users.id`, CASCADE); `created_at` y `updated_at`. Sin columna de vencimiento. Ejecutar `node ace migration:run` y verificar que `database/schema.ts` contiene `TaskSchema` con esas columnas.
 - [x] 1.2 Definir la constante `TASK_STATUSES = ['pending', 'in_progress', 'done'] as const` y su tipo. Verificar con `npm run typecheck`.
-- [x] 1.3 Crear el modelo `Task`, que extiende `TaskSchema`, con la relación `belongsTo` `assignee` hacia `User` por `assigneeId`. Verificar con `npm run typecheck`, y en `node ace repl` que `Task.query().preload('assignee')` funciona.
+- [x] 1.3 Crear el modelo `Task`, que extiende `TaskSchema`, con la relación `belongsTo` `assignee` hacia `User` por `assigneeId`. Verificar con `npm run typecheck`, y comprobar que `preload('assignee')` funciona a través de la API (`GET /api/v1/tasks` devuelve cada tarea con su `assignee`) en la tarea 2.5.
 
 ## 2. API de tareas (backend)
 

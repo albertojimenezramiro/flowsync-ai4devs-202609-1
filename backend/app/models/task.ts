@@ -4,8 +4,8 @@ import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import User from '#models/user'
 
 /**
- * Conjunto cerrado de estados. Es la única fuente: validadores y tipos lo
- * reutilizan, y la BD no lo restringe (la API es el único escritor).
+ * Closed set of task statuses. Single source of truth for validators and
+ * types; the database does not enforce it (the API is the only writer).
  */
 export const TASK_STATUSES = ['pending', 'in_progress', 'done'] as const
 

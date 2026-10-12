@@ -6,7 +6,7 @@ import { createTaskValidator, updateTaskValidator } from '#validators/task'
 
 export default class TasksController {
   async index({ serialize }: HttpContext) {
-    // Sin orderBy a propósito: no hay regla de orden decidida (PA-3 del PRD).
+    // No orderBy on purpose: there is no agreed ordering rule yet (PRD PA-3).
     const tasks = await Task.query().preload('assignee')
 
     return serialize(TaskTransformer.transform(tasks))
@@ -29,8 +29,8 @@ export default class TasksController {
   async update({ params, request, serialize }: HttpContext) {
     const task = await Task.findOrFail(params.id)
 
-    // `optional()` acepta null y descarta el campo (y el bodyparser convierte
-    // "" en null), así que un null explícito se rechaza aquí para no ignorarlo.
+    // `optional()` accepts null and drops the field (and the bodyparser turns
+    // "" into null), so an explicit null is rejected here instead of ignored.
     const body = request.body()
     const nullFields = (['status', 'assigneeId'] as const).filter(
       (field) => field in body && body[field] === null

@@ -34,7 +34,7 @@ router
       .as('profile')
       .use(middleware.auth())
 
-    // Exactamente tres operaciones: sin lectura individual ni borrado.
+    // Exactly three operations: no single-task read and no delete.
     router
       .group(() => {
         router.get('/', [controllers.Tasks, 'index'])
