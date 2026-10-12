@@ -11,6 +11,9 @@ import { middleware } from '#start/kernel'
 import router from '@adonisjs/core/services/router'
 import { controllers } from '#generated/controllers'
 
+// Canonical positive integers only: rejects 1.0, -1 and leading zeros (01).
+const canonicalId = { match: /^[1-9]\d*$/, cast: (value: string) => Number(value) }
+
 router.get('/', () => {
   return { hello: 'world' }
 })
@@ -34,15 +37,13 @@ router
       .as('profile')
       .use(middleware.auth())
 
-    // Exactly three operations: no single-task read and no delete.
+    // Exactly four operations: list, read one, create and update. No delete.
     router
       .group(() => {
         router.get('/', [controllers.Tasks, 'index'])
         router.post('/', [controllers.Tasks, 'store'])
-        router
-          .patch(':id', [controllers.Tasks, 'update'])
-          // Canonical positive integers only: rejects 1.0, -1 and leading zeros (01).
-          .where('id', { match: /^[1-9]\d*$/, cast: (value) => Number(value) })
+        router.get(':id', [controllers.Tasks, 'show']).where('id', canonicalId)
+        router.patch(':id', [controllers.Tasks, 'update']).where('id', canonicalId)
       })
       .prefix('tasks')
       .use(middleware.auth())

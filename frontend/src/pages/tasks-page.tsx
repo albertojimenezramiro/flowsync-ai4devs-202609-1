@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { AlertCircleIcon } from 'lucide-react'
 import { useAuth } from '@/auth/use-auth'
 import { FieldError } from '@/components/field-error'
+import { TaskPanel } from '@/components/task-panel'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
@@ -37,8 +38,11 @@ export function TasksPage() {
   // Último aviso de una acción (crear o cambiar estado): cada acción lo
   // sustituye, así nunca queda visible uno obsoleto tapando al nuevo.
   const [notice, setNotice] = useState<string | null>(null)
-  // Filas con un cambio de estado en vuelo: sus botones se bloquean.
+  // Tareas con una petición en vuelo (estado, apertura o fecha): sus controles
+  // se bloquean, así que nunca hay dos respuestas cruzadas sobre la misma.
   const [savingIds, setSavingIds] = useState<ReadonlySet<number>>(new Set())
+  // Como mucho una tarea abierta: la lista no debe acabar llena de fechas.
+  const [openId, setOpenId] = useState<number | null>(null)
 
   const [title, setTitle] = useState('')
   const [titleError, setTitleError] = useState<string | null>(null)
@@ -111,6 +115,24 @@ export function TasksPage() {
     }
   }
 
+  const replaceTask = (task: Task) =>
+    setTasks((current) =>
+      current.map((item) => (item.id === task.id ? task : item)),
+    )
+
+  const withLock = async <T,>(id: number, action: () => Promise<T>) => {
+    setSavingIds((current) => new Set(current).add(id))
+    try {
+      return await action()
+    } finally {
+      setSavingIds((current) => {
+        const next = new Set(current)
+        next.delete(id)
+        return next
+      })
+    }
+  }
+
   const handleStatusChange = async (task: Task, status: TaskStatus) => {
     if (!token || task.status === status) return
 
@@ -124,9 +146,13 @@ export function TasksPage() {
 
     setNotice(null)
     setRowStatus(status)
-    setSavingIds((current) => new Set(current).add(task.id))
     try {
-      await api.updateTaskStatus(token, task.id, status)
+      // La respuesta trae el veredicto de vencimiento recalculado.
+      replaceTask(
+        await withLock(task.id, () =>
+          api.updateTaskStatus(token, task.id, status),
+        ),
+      )
     } catch (error) {
       setRowStatus(previous)
       setNotice(
@@ -134,12 +160,6 @@ export function TasksPage() {
           ? `${STATUS_ERROR} ${error.message}`
           : STATUS_ERROR,
       )
-    } finally {
-      setSavingIds((current) => {
-        const next = new Set(current)
-        next.delete(task.id)
-        return next
-      })
     }
   }
 
@@ -217,35 +237,61 @@ export function TasksPage() {
           ) : (
             <ul className="divide-y">
               {tasks.map((task) => (
-                <li
-                  key={task.id}
-                  className="flex flex-wrap items-center justify-between gap-3 py-3"
-                >
-                  <div className="min-w-0">
-                    <p className="font-medium break-words">{task.title}</p>
-                    <p className="text-muted-foreground text-sm">
-                      {task.assignee.fullName?.trim() || 'Sin nombre'}
-                    </p>
+                <li key={task.id} className="py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium break-words">{task.title}</p>
+                      <p className="text-muted-foreground text-sm">
+                        {task.assignee.fullName?.trim() || 'Sin nombre'}
+                      </p>
+                    </div>
+                    <div
+                      className="flex gap-1"
+                      role="group"
+                      aria-label={`Estado de «${task.title}»`}
+                    >
+                      {TASK_STATUSES.map((status) => (
+                        <Button
+                          key={status}
+                          type="button"
+                          size="sm"
+                          variant={
+                            task.status === status ? 'default' : 'outline'
+                          }
+                          aria-pressed={task.status === status}
+                          disabled={savingIds.has(task.id)}
+                          onClick={() => handleStatusChange(task, status)}
+                        >
+                          {STATUS_LABELS[status]}
+                        </Button>
+                      ))}
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      aria-expanded={openId === task.id}
+                      aria-controls={`task-panel-${task.id}`}
+                      onClick={() =>
+                        setOpenId((current) =>
+                          current === task.id ? null : task.id,
+                        )
+                      }
+                    >
+                      {openId === task.id ? 'Cerrar' : 'Abrir'}
+                    </Button>
                   </div>
-                  <div
-                    className="flex gap-1"
-                    role="group"
-                    aria-label={`Estado de «${task.title}»`}
-                  >
-                    {TASK_STATUSES.map((status) => (
-                      <Button
-                        key={status}
-                        type="button"
-                        size="sm"
-                        variant={task.status === status ? 'default' : 'outline'}
-                        aria-pressed={task.status === status}
-                        disabled={savingIds.has(task.id)}
-                        onClick={() => handleStatusChange(task, status)}
-                      >
-                        {STATUS_LABELS[status]}
-                      </Button>
-                    ))}
-                  </div>
+                  {/* Se desmonta al cerrar: con la tarea cerrada no queda
+                      ninguna fecha ni marca de vencida en la página. */}
+                  {openId === task.id && token && (
+                    <TaskPanel
+                      id={`task-panel-${task.id}`}
+                      task={task}
+                      token={token}
+                      onTask={replaceTask}
+                      withLock={(action) => withLock(task.id, action)}
+                    />
+                  )}
                 </li>
               ))}
             </ul>
