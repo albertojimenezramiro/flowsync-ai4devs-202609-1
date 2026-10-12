@@ -21,10 +21,17 @@ Sobre el envío duplicado, en `frontend/src/components/task-panel.tsx`:
 
 ## Decisions
 
-- **Documentar en vez de cambiar el comportamiento de la zona horaria.** El servidor ya acepta nombres de zona sin distinguir mayúsculas (luxon), trata como ausente una cabecera formada solo por espacios (`trim()` en `reference_date.ts`) y resuelve la zona antes de buscar la tarea, así que un `422` gana a un `404`. Es compatible con el contrato y no afecta al cliente. Alternativa descartada: rechazar nombres mal capitalizados. Añadiría una regla sin beneficio para ningún cliente real.
+- **Documentar en vez de cambiar el comportamiento de la zona horaria.** El servidor ya acepta nombres de zona sin distinguir mayúsculas (lo resuelve `Intl`/ICU de Node, que luxon usa por debajo; también pasan `gmt` o `est5edt`), trata como ausente una cabecera formada solo por espacios (`trim()` en `reference_date.ts`) y resuelve la zona antes de buscar la tarea, así que un `422` gana a un `404`. Es compatible con el contrato y no afecta al cliente. Alternativa descartada: rechazar nombres mal capitalizados. Añadiría una regla sin beneficio para ningún cliente real.
 - **Acotar el bloqueo a los botones de estado.** Es lo que hace el código y lo único que evita respuestas cruzadas. El campo de fecha ya se protege con `readOnly` durante su propio guardado, y bloquearlo durante un cambio de estado solo añadiría fricción. Alternativa descartada: bloquear todos los controles del panel.
-- **Evitar el envío duplicado con una guarda síncrona.** Se guarda en un `useRef` la fecha que está en vuelo (`inFlight`). `commit()` no envía nada si `draft === inFlight.current`, y `save()` limpia la referencia en `finally`. Sigue el mismo patrón que `creatingRef` en `tasks-page.tsx`. Alternativa descartada: depender de `isSaving`. El estado de React no se refleja hasta el siguiente render, así que no protege frente a dos eventos seguidos.
-- **El Purpose se edita directamente** en `openspec/specs/tasks/spec.md`, porque un delta no puede cambiarlo. Se hace como tarea del apply, no al proponer.
+- **Evitar el envío duplicado con una guarda síncrona.** Un `useRef<boolean>` (`savingRef`) marca que hay un guardado de fecha en vuelo, tanto para poner una fecha como para quitarla.
+  - `commit()` no hace nada mientras esté activo.
+  - `save()` lo activa al empezar y lo desactiva en `finally`. Se limpia en `finally`, y no antes, para cubrir tanto el éxito como el fallo, que permite reintentar.
+  - Un blur posterior a `finally` ya ve el `draft` sincronizado con la fecha guardada, así que no reenvía nada.
+  - Sigue el mismo patrón que `creatingRef` en `tasks-page.tsx`.
+  - Alternativa descartada (señalada en la revisión): comparar por valor (`draft === enVuelo`). Si el valor cambiara durante el vuelo, por ejemplo con un selector nativo que ignore `readOnly`, se lanzaría un segundo guardado concurrente.
+  - Alternativa descartada: depender de `isSaving`. El estado de React no se refleja hasta el siguiente render, así que no protege frente a dos eventos seguidos.
+- **El Purpose se edita directamente** en `openspec/specs/tasks/spec.md`, porque un delta no puede cambiarlo. Se hace como tarea del apply, no al proponer, y antes de archivar.
+- **Cerrar con una fecha incompleta la descarta sin aviso.** Al cerrar, el panel se desmonta y no hay dónde mostrar «Introduce una fecha completa y válida.». Es lo que hace el código y ahora lo dice la spec. Una fecha completa sí se confirma al cerrar, y si falla se avisa en la página.
 
 ## Risks / Trade-offs
 

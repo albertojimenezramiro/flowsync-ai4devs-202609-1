@@ -12,7 +12,8 @@ La revisión adversarial del archivo de `add-task-due-date` encontró que la spe
 - **«Abrir una tarea desde su fila»**: aclara que abrir y cerrar no modifican nada por sí mismos, pero cerrar confirma una fecha que se estuviera editando, como ya dice «Poner, cambiar y quitar la fecha en el panel».
 - **«Poner, cambiar y quitar la fecha en el panel»**:
   - «Quitar fecha» desaparece cuando el servidor lo confirma, no «al momento».
-  - Una misma confirmación se envía **una sola vez**. Esto corrige el código: hoy, Intro seguido de salir del campo antes de la respuesta repite el `PATCH`.
+  - Mientras haya un guardado de fecha en curso, ninguna otra confirmación se envía. Esto corrige el código: hoy, Intro seguido de salir del campo antes de la respuesta repite el `PATCH`. Tras un fallo se puede reintentar.
+- **«Abrir una tarea desde su fila»**, además: cerrar con una fecha a medio escribir la descarta sin aviso, porque el panel se desmonta. Es lo que hace hoy el código.
 - **«El día de referencia es el de quien mira»**: deja escrito lo que el servidor ya hace.
   - El nombre de zona no distingue mayúsculas.
   - Una cabecera con solo espacios cuenta como ausente.
