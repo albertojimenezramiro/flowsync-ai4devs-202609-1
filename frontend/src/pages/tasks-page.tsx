@@ -38,6 +38,10 @@ export function TasksPage() {
   // Último aviso de una acción (crear o cambiar estado): cada acción lo
   // sustituye, así nunca queda visible uno obsoleto tapando al nuevo.
   const [notice, setNotice] = useState<string | null>(null)
+  // Avisos de un panel de fecha ya cerrado (fecha no guardada). Van aparte de
+  // `notice` para que un cambio de estado posterior no los pise; se borran al
+  // volver a abrir una tarea.
+  const [dateNotice, setDateNotice] = useState<string | null>(null)
   // Peticiones en vuelo por tarea (estado, apertura o fecha). Es un contador,
   // no un conjunto: una petición que termina no libera la tarea si quedan otras.
   const [pending, setPending] = useState<ReadonlyMap<number, number>>(new Map())
@@ -250,6 +254,13 @@ export function TasksPage() {
             </Alert>
           )}
 
+          {dateNotice && (
+            <Alert variant="destructive">
+              <AlertCircleIcon />
+              <AlertDescription>{dateNotice}</AlertDescription>
+            </Alert>
+          )}
+
           {isLoading ? (
             <p
               className="text-muted-foreground text-sm"
@@ -310,11 +321,12 @@ export function TasksPage() {
                       aria-controls={
                         openId === task.id ? `task-panel-${task.id}` : undefined
                       }
-                      onClick={() =>
+                      onClick={() => {
+                        if (openId !== task.id) setDateNotice(null)
                         setOpenId((current) =>
                           current === task.id ? null : task.id,
                         )
-                      }
+                      }}
                     >
                       {openId === task.id ? 'Cerrar' : 'Abrir'}
                     </Button>
@@ -334,7 +346,7 @@ export function TasksPage() {
                       isWriting={() => isWriting(task.id)}
                       writing={isWriting(task.id)}
                       busy={isBusy(task.id)}
-                      onError={setNotice}
+                      onError={setDateNotice}
                     />
                   )}
                 </li>
