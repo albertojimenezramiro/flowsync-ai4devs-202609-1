@@ -25,6 +25,13 @@ type TaskPanelProps = {
   run: <T>(action: () => Promise<T>, write?: boolean) => Promise<T>
   /** Número de escrituras lanzadas sobre la tarea; sirve para descartar lecturas viejas. */
   writeVersion: () => number
+  /**
+   * Si hay ahora mismo alguna escritura en vuelo sobre la tarea (estado o
+   * fecha). Es síncrono y vive en la página: sobrevive a cerrar y reabrir.
+   */
+  isWriting: () => boolean
+  /** Hay alguna petición en curso sobre la tarea: el campo no se edita. */
+  busy: boolean
   /** Para errores que llegan con el panel ya cerrado: se avisan en la página. */
   onError: (message: string) => void
 }
@@ -45,6 +52,8 @@ export function TaskPanel({
   onTask,
   run,
   writeVersion,
+  isWriting,
+  busy,
   onError,
 }: TaskPanelProps) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -56,10 +65,6 @@ export function TaskPanel({
   const [isSaving, setSaving] = useState(false)
   const mounted = useRef(true)
   const inputRef = useRef<HTMLInputElement>(null)
-  // Guarda síncrona: hay un guardado de fecha en vuelo. `isSaving` no basta
-  // porque no se refleja hasta el siguiente render, y Intro seguido de salir
-  // del campo llegaría a enviar dos veces.
-  const savingRef = useRef(false)
   // Última fecha confirmada por el servidor, actualizada en cuanto responde:
   // un blur que llegue antes del siguiente render no debe reenviarla.
   const savedRef = useRef(saved)
@@ -83,12 +88,15 @@ export function TaskPanel({
   useEffect(() => {
     let cancelled = false
     const issuedAt = writeVersion()
+    // Una lectura emitida con una escritura en vuelo puede llegar con datos de
+    // antes de esa escritura: la lista ya recibirá la respuesta de la escritura.
+    const writingAtIssue = isWriting()
     run(() => api.getTask(token, task.id))
       .then((fresh) => {
         if (cancelled) return
         // Si mientras tanto se escribió en la tarea, esta lectura es vieja: la
         // lista ya tiene lo que devolvió esa escritura.
-        if (writeVersion() === issuedAt) onTask(fresh)
+        if (!writingAtIssue && writeVersion() === issuedAt) onTask(fresh)
         setStatus('ready')
       })
       .catch((error: unknown) => {
@@ -110,8 +118,10 @@ export function TaskPanel({
   }, [])
 
   const save = async (dueDate: string | null) => {
+    // Guarda síncrona: con una escritura en vuelo sobre la tarea (fecha o
+    // estado) no se lanza otra. Cubre también «Quitar fecha».
+    if (isWriting()) return
     setDateError(null)
-    savingRef.current = true
     setSaving(true)
     try {
       const updated = await run(
@@ -120,20 +130,25 @@ export function TaskPanel({
       )
       savedRef.current = updated.dueDate ?? ''
       onTask(updated)
-      if (dueDate === null) inputRef.current?.focus()
+      if (dueDate === null && inputRef.current) {
+        // Si quedaba texto a medias en el campo, React no lo reescribe (su
+        // valor ya era ''): se limpia a mano para no dejar restos.
+        inputRef.current.value = ''
+        inputRef.current.focus()
+      }
     } catch (error) {
       if (!mounted.current) {
         // Se cerró la tarea antes de la respuesta: que el fallo no se pierda.
         onError(saveError(error))
         return
       }
-      setDraft(saved)
+      setDraft(savedRef.current)
       setDateError(saveError(error))
     } finally {
-      // Se libera aquí, tras éxito o fallo: un fallo debe poder reintentarse, y
-      // tras un éxito `savedRef` ya tiene la fecha guardada, así que un blur
-      // anterior al siguiente render no la reenvía.
-      savingRef.current = false
+      // `run` libera la guarda de escritura en su propio finally, tras éxito o
+      // fallo (un fallo debe poder reintentarse). Tras un éxito, `savedRef` ya
+      // tiene la fecha guardada antes de que pueda llegar otro evento, así que
+      // un blur anterior al siguiente render no la reenvía.
       if (mounted.current) setSaving(false)
     }
   }
@@ -142,7 +157,7 @@ export function TaskPanel({
   // así no se guardan fechas intermedias al teclear el año cifra a cifra.
   const commit = (input: HTMLInputElement) => {
     // Con un guardado en vuelo se ignora cualquier otra confirmación.
-    if (savingRef.current) return
+    if (isWriting()) return
     const incomplete = input.validity.badInput
     if (!incomplete && draft === savedRef.current) return
 
@@ -154,8 +169,8 @@ export function TaskPanel({
     // Vacío, a medias o con un año de más de cuatro cifras. Vaciar el campo
     // no quita la fecha: para eso está «Quitar fecha».
     setDateError(INVALID_DATE)
-    setDraft(saved)
-    input.value = saved
+    setDraft(savedRef.current)
+    input.value = savedRef.current
   }
 
   return (
@@ -188,7 +203,7 @@ export function TaskPanel({
                 className="w-auto"
                 value={draft}
                 // readOnly y no disabled: deshabilitar quitaría el foco.
-                readOnly={isSaving}
+                readOnly={isSaving || busy}
                 aria-busy={isSaving}
                 onChange={(event) => {
                   setDateError(null)
@@ -209,7 +224,7 @@ export function TaskPanel({
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={isSaving}
+                  disabled={isSaving || busy}
                   // Sin robar el foco al campo: si no, su blur guardaría el
                   // borrador y este clic llegaría con el botón deshabilitado.
                   onMouseDown={(event) => event.preventDefault()}
