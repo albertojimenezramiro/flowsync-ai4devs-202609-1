@@ -45,6 +45,10 @@ export function TasksPage() {
   // Escrituras lanzadas por tarea: una lectura emitida antes de la última
   // escritura se descarta, para que no pise datos más recientes.
   const writeVersions = useRef(new Map<number, number>())
+  // Escrituras en vuelo por tarea, contadas de forma síncrona: la guarda vive
+  // aquí y no en el panel, para que cerrar y reabrir una tarea no la pierda.
+  const writesInFlight = useRef(new Map<number, number>())
+  const isWriting = (id: number) => (writesInFlight.current.get(id) ?? 0) > 0
   // Como mucho una tarea abierta: la lista no debe acabar llena de fechas.
   const [openId, setOpenId] = useState<number | null>(null)
 
@@ -138,19 +142,32 @@ export function TasksPage() {
     action: () => Promise<T>,
     write = false,
   ) => {
+    const writes = writesInFlight.current
     if (write) {
       writeVersions.current.set(id, (writeVersions.current.get(id) ?? 0) + 1)
+      writes.set(id, (writes.get(id) ?? 0) + 1)
     }
     bump(id, 1)
     try {
       return await action()
     } finally {
+      if (write) {
+        const left = (writes.get(id) ?? 1) - 1
+        if (left > 0) writes.set(id, left)
+        else writes.delete(id)
+      }
       bump(id, -1)
     }
   }
 
   const handleStatusChange = async (task: Task, status: TaskStatus) => {
-    if (!token || task.status === status || isBusy(task.id)) return
+    if (
+      !token ||
+      task.status === status ||
+      isBusy(task.id) ||
+      isWriting(task.id)
+    )
+      return
 
     const previous = task.status
     const setRowStatus = (value: TaskStatus) =>
@@ -314,6 +331,9 @@ export function TasksPage() {
                       writeVersion={() =>
                         writeVersions.current.get(task.id) ?? 0
                       }
+                      isWriting={() => isWriting(task.id)}
+                      writing={isWriting(task.id)}
+                      busy={isBusy(task.id)}
                       onError={setNotice}
                     />
                   )}

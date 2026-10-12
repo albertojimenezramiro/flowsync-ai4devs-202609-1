@@ -1,7 +1,7 @@
 # tasks Specification
 
 ## Purpose
-Mantener una única lista de tareas compartida por todo el equipo, donde cualquiera crea tareas con solo el título y ve y cambia en qué estado está cada una y quién la lleva.
+Mantener una única lista de tareas compartida por todo el equipo, donde cualquiera crea tareas con solo el título, ve quién lleva cada una y en qué estado está y cambia ese estado desde la propia lista, y al abrir una tarea pone, cambia o quita su fecha de vencimiento y ve si está vencida según su propio día.
 
 ## Requirements
 
@@ -261,7 +261,7 @@ La pantalla SHALL explicar en lenguaje corriente, junto al campo, por qué no se
 - **THEN** ve «El título no puede superar los 120 caracteres.» junto al campo, su texto sigue íntegro en el campo y no se crea nada
 
 ### Requirement: Cambiar el estado desde la fila
-Cada fila SHALL permitir cambiar el estado de su tarea con un solo gesto, sin abrirla, sin diálogo de confirmación y sin rellenar ningún campo. Los únicos destinos ofrecidos SHALL ser «Pendiente», «En curso» y «Hecho», con el actual marcado. El nuevo estado SHALL reflejarse de inmediato. Si el servidor rechaza el cambio, la fila SHALL volver a su estado anterior y mostrarse un aviso que empiece por «No se pudo guardar el cambio de estado.» seguido del motivo. Si lo acepta, la tarea SHALL quedar como la devuelve el servidor, incluido su veredicto de vencimiento. Mientras haya una petición en curso sobre una tarea (cambio de estado, apertura o cambio de fecha), sus controles SHALL estar deshabilitados, para que no se crucen respuestas.
+Cada fila SHALL permitir cambiar el estado de su tarea con un solo gesto, sin abrirla, sin diálogo de confirmación y sin rellenar ningún campo. Los únicos destinos ofrecidos SHALL ser «Pendiente», «En curso» y «Hecho», con el actual marcado. El nuevo estado SHALL reflejarse de inmediato. Si el servidor rechaza el cambio, la fila SHALL volver a su estado anterior y mostrarse un aviso que empiece por «No se pudo guardar el cambio de estado.» seguido del motivo. Si lo acepta, la tarea SHALL quedar como la devuelve el servidor, incluido su veredicto de vencimiento. Mientras haya una petición en curso sobre una tarea (cambio de estado, apertura o cambio de fecha), los botones de estado de su fila SHALL estar deshabilitados, para que no se crucen respuestas.
 
 #### Scenario: Cambio desde la lista
 - **WHEN** la persona elige «En curso» en una tarea que está en «Pendiente»
@@ -276,7 +276,7 @@ Cada fila SHALL permitir cambiar el estado de su tarea con un solo gesto, sin ab
 - **THEN** ve exactamente «Pendiente», «En curso» y «Hecho», y la tarea queda siempre en uno de ellos
 
 #### Scenario: Petición en curso
-- **WHEN** la tarea abierta se está cargando o guardando su fecha
+- **WHEN** hay en curso un cambio de estado de una tarea, o la tarea abierta se está cargando o guardando su fecha
 - **THEN** los botones de estado de su fila están deshabilitados hasta que termina
 
 #### Scenario: El servidor rechaza el cambio
@@ -284,11 +284,11 @@ Cada fila SHALL permitir cambiar el estado de su tarea con un solo gesto, sin ab
 - **THEN** la fila vuelve a mostrar el estado que tenía y la persona ve «No se pudo guardar el cambio de estado.» seguido del motivo (por ejemplo, que no se pudo conectar con el servidor)
 
 ### Requirement: Mirar la lista no cambia nada
-Abrir y recorrer la lista SHALL NOT cambiar el estado ni el responsable de ninguna tarea.
+Abrir y recorrer la lista SHALL NOT cambiar el estado, el responsable ni la fecha de vencimiento de ninguna tarea.
 
 #### Scenario: Solo mirar
 - **WHEN** una persona abre la lista y la recorre sin pulsar nada
-- **THEN** todas las tareas conservan su estado y su responsable
+- **THEN** todas las tareas conservan su estado, su responsable y su fecha de vencimiento
 
 ### Requirement: Fecha de vencimiento de calendario
 La fecha de vencimiento SHALL ser una fecha de calendario sin hora, enviada y devuelta como `YYYY-MM-DD`, con año de cuatro cifras. La API SHALL aceptar cualquier fecha válida, incluidas las anteriores a hoy. Enviar `dueDate` como `null` o cadena vacía SHALL quitar la fecha. Una fecha inexistente, incompleta, con hora o de otro tipo SHALL rechazarse con `422` y un error sobre `dueDate`, sin cambiar la tarea.
@@ -357,7 +357,7 @@ El sistema SHALL considerar una tarea vencida (`isOverdue: true`) si y solo si s
 - **THEN** la primera lectura da `isOverdue: false` y la segunda `true`
 
 ### Requirement: El día de referencia es el de quien mira
-El servidor SHALL tomar como día de referencia la fecha actual en la zona horaria IANA (un nombre como `Europe/Madrid` o `UTC`, no un desfase como `+02:00`) que el cliente envía en la cabecera `X-Timezone`, en cualquier operación que devuelva tareas. Sin cabecera, o con la cabecera vacía, SHALL usar la fecha actual en UTC. Una zona que no exista o no sea un nombre IANA SHALL rechazarse con `422`, sin aplicar ningún cambio.
+El servidor SHALL tomar como día de referencia la fecha actual en la zona horaria IANA (un nombre como `Europe/Madrid` o `UTC`, no un desfase como `+02:00`) que el cliente envía en la cabecera `X-Timezone`, en cualquier operación que devuelva tareas. El nombre de zona SHALL aceptarse sin distinguir mayúsculas de minúsculas. Sin cabecera, o con la cabecera vacía o formada solo por espacios, SHALL usar la fecha actual en UTC. Una zona que no exista o no sea un nombre IANA SHALL rechazarse con `422`, sin aplicar ningún cambio, y ese `422` SHALL tener prioridad sobre un `404` de la misma petición.
 
 #### Scenario: Dos zonas, dos veredictos
 - **WHEN** una tarea no hecha vence el día que es hoy en `Etc/GMT+12`, y en el mismo momento se lee con `X-Timezone: Etc/GMT+12` y con `X-Timezone: Pacific/Kiritimati`, donde ya es un día posterior
@@ -366,6 +366,14 @@ El servidor SHALL tomar como día de referencia la fecha actual en la zona horar
 #### Scenario: Sin zona
 - **WHEN** se piden tareas sin cabecera `X-Timezone`
 - **THEN** el veredicto se calcula con la fecha actual en UTC
+
+#### Scenario: Mayúsculas y espacios
+- **WHEN** se envía `X-Timezone: europe/madrid`, o `X-Timezone` formada solo por espacios
+- **THEN** la primera se trata como `Europe/Madrid` y la segunda como si no hubiera cabecera (UTC)
+
+#### Scenario: Zona inválida sobre una tarea inexistente
+- **WHEN** se lee o actualiza una tarea que no existe con `X-Timezone: Marte/Olympus`
+- **THEN** la respuesta es `422`, no `404`
 
 #### Scenario: Zona inválida
 - **WHEN** se envía `X-Timezone: Marte/Olympus` o `X-Timezone: +02:00` al listar, leer, crear o actualizar
@@ -391,11 +399,19 @@ El sistema SHALL responder a `GET /api/v1/tasks/:id`, con `:id` entero positivo 
 - **THEN** la respuesta es `401`
 
 ### Requirement: Abrir una tarea desde su fila
-Cada fila de la lista SHALL tener un control «Abrir» que despliega bajo ella el panel de esa tarea, y que pasa a «Cerrar» para plegarlo. El control SHALL ser operable con teclado y anunciar si el panel está abierto. Al abrirlo, el panel SHALL pedir la tarea al servidor y, hasta recibirla, SHALL mostrar «Cargando…» sin fecha ni veredicto. Si la petición falla, SHALL mostrar «No se pudo abrir la tarea.» seguido del motivo, sin fecha ni veredicto. Abrir y cerrar SHALL NOT modificar la tarea.
+Cada fila de la lista SHALL tener un control «Abrir» que despliega bajo ella el panel de esa tarea, y que pasa a «Cerrar» para plegarlo. El control SHALL ser operable con teclado y anunciar si el panel está abierto. Al abrirlo, el panel SHALL pedir la tarea al servidor y, hasta recibirla, SHALL mostrar «Cargando…» sin fecha ni veredicto. Si hay una escritura en curso sobre la tarea, o la hubo mientras se leía, la lectura SHALL repetirse cuando termine, y el panel SHALL seguir en «Cargando…» hasta tener una respuesta posterior a todas ellas, aunque la escritura falle. Si la petición falla, SHALL mostrar «No se pudo abrir la tarea.» seguido del motivo, sin fecha ni veredicto. Abrir y cerrar SHALL NOT modificar la tarea por sí mismos. Si al cerrarla, o al abrir otra tarea, el campo de fecha tiene una fecha completa y válida distinta de la guardada, ese gesto la confirma (ver «Poner, cambiar y quitar la fecha en el panel»); si tiene una fecha incompleta o inválida, se descarta, no queda ningún aviso tras cerrarse y la tarea conserva su fecha.
 
 #### Scenario: Abrir y cerrar
 - **WHEN** la persona pulsa «Abrir» en una fila y después «Cerrar»
 - **THEN** se despliega el panel de esa tarea y luego se pliega, y la fila vuelve a mostrar solo título, responsable y estado
+
+#### Scenario: Abrir y cerrar sin tocar nada
+- **WHEN** la persona abre una tarea y la cierra sin editar el campo de fecha
+- **THEN** no se envía ninguna modificación y la tarea queda igual
+
+#### Scenario: Cerrar con una fecha a medias
+- **WHEN** la persona deja el campo de fecha a medio escribir y pulsa «Cerrar» o abre otra tarea
+- **THEN** no se envía nada, una vez cerrada no queda ningún aviso en la página y la tarea conserva la fecha que tenía
 
 #### Scenario: Con teclado
 - **WHEN** la persona llega al control con el tabulador y lo activa con Intro o espacio
@@ -405,12 +421,16 @@ Cada fila de la lista SHALL tener un control «Abrir» que despliega bajo ella e
 - **WHEN** la lista se cargó antes de que una tarea pasara a estar vencida y la persona la abre después
 - **THEN** el panel muestra «Cargando…» y luego «Vencida», sin mostrar en ningún momento el veredicto anterior
 
+#### Scenario: Abrir durante un cambio de estado
+- **WHEN** la persona abre una tarea mientras su cambio de estado está en curso, y ese cambio falla
+- **THEN** el panel muestra «Cargando…» hasta que termina el cambio y después el veredicto que da una lectura nueva, nunca el que tenía la lista
+
 #### Scenario: Fallo al abrir
 - **WHEN** la persona abre una tarea y el servidor no responde
 - **THEN** el panel muestra «No se pudo abrir la tarea.» con el motivo, sin campo de fecha ni veredicto
 
 ### Requirement: Poner, cambiar y quitar la fecha en el panel
-El panel SHALL ofrecer un campo «Fecha de vencimiento» que, sin botón de guardar, guarda la fecha cuando la persona confirma el campo: al salir de él (incluido al cerrar la tarea) o al pulsar Intro. Mientras escribe no SHALL enviarse nada. Si la tarea tiene fecha, SHALL ofrecer un botón «Quitar fecha» que la quita sin confirmación. El resultado SHALL verse en el panel en cuanto el servidor lo confirma, sin recargar ni volver a abrir. Al confirmar una fecha incompleta, inválida o con año de más de cuatro cifras, SHALL mostrar «Introduce una fecha completa y válida.» junto al campo, no SHALL enviarse nada y el campo SHALL volver a la fecha guardada. Vaciar el campo no quita la fecha. Si el servidor rechaza el cambio, SHALL mostrarse junto al campo «No se pudo guardar la fecha.» seguido del motivo y SHALL conservarse la fecha anterior.
+El panel SHALL ofrecer un campo «Fecha de vencimiento» que, sin botón de guardar, guarda la fecha cuando la persona confirma el campo: al salir de él (incluido al cerrar la tarea) o al pulsar Intro. Mientras escribe no SHALL enviarse nada. Mientras haya una escritura en curso sobre la tarea (de su fecha o de su estado), ninguna otra confirmación de fecha ni «Quitar fecha» SHALL enviarse, aunque la tarea se haya cerrado y vuelto a abrir, y el campo y «Quitar fecha» SHALL quedar inactivos hasta que termine. Si aun así llega una confirmación con una fecha distinta de la guardada, SHALL mostrarse «Hay otro cambio guardándose. Espera a que termine y vuelve a intentarlo.» y el campo SHALL volver a la fecha guardada. Tras un fallo, volver a confirmar SHALL reenviar la fecha. Si la tarea tiene fecha, SHALL ofrecer un botón «Quitar fecha» que la quita sin confirmación. El resultado SHALL verse en el panel en cuanto el servidor lo confirma, sin recargar ni volver a abrir. Al confirmar una fecha incompleta, inválida o con año de más de cuatro cifras, SHALL mostrar «Introduce una fecha completa y válida.» junto al campo, no SHALL enviarse nada y el campo SHALL volver a la fecha guardada. Vaciar el campo no quita la fecha. Si el servidor rechaza el cambio, SHALL mostrarse junto al campo «No se pudo guardar la fecha.» seguido del motivo y SHALL conservarse la fecha anterior.
 
 #### Scenario: Poner una fecha
 - **WHEN** la persona abre una tarea sin fecha y elige el 20 de octubre de 2026
@@ -418,7 +438,23 @@ El panel SHALL ofrecer un campo «Fecha de vencimiento» que, sin botón de guar
 
 #### Scenario: Quitar la fecha
 - **WHEN** la persona pulsa «Quitar fecha» en una tarea con fecha
-- **THEN** la fecha desaparece al momento, sin diálogo de confirmación, y deja de mostrarse «Vencida» si se mostraba
+- **THEN** la fecha desaparece en cuanto el servidor lo confirma, sin diálogo de confirmación, y deja de mostrarse «Vencida» si se mostraba
+
+#### Scenario: Intro y luego salir del campo
+- **WHEN** la persona escribe una fecha, pulsa Intro y sale del campo antes de que responda el servidor
+- **THEN** se envía un único guardado con esa fecha
+
+#### Scenario: Reabrir con un guardado en curso
+- **WHEN** la persona confirma una fecha, cierra la tarea y la vuelve a abrir antes de que responda el servidor
+- **THEN** el panel muestra «Cargando…» hasta que termina ese guardado, después la fecha guardada (o, si falló, el aviso en la página y la fecha anterior) y no se envía ningún segundo guardado
+
+#### Scenario: Fecha durante un cambio de estado
+- **WHEN** hay en curso un cambio de estado de la tarea abierta
+- **THEN** el campo de fecha y «Quitar fecha» están inactivos hasta que termina, para que las respuestas no se crucen
+
+#### Scenario: Reintento tras un fallo
+- **WHEN** el guardado de una fecha falla y la persona vuelve a escribirla y confirmarla
+- **THEN** se envía de nuevo
 
 #### Scenario: Fecha incompleta
 - **WHEN** la persona deja el campo a medio escribir (por ejemplo, solo el día y el mes) o con un año de cinco cifras, y sale de él
