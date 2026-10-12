@@ -10,6 +10,8 @@ import type { Task } from '@/lib/types'
 
 const FULL_DATE = /^\d{4}-\d{2}-\d{2}$/
 const INVALID_DATE = 'Introduce una fecha completa y válida.'
+const WAIT_FOR_SAVE =
+  'Hay otro cambio guardándose. Espera a que termine y vuelve a intentarlo.'
 
 type TaskPanelProps = {
   id: string
@@ -32,6 +34,8 @@ type TaskPanelProps = {
   isWriting: () => boolean
   /** Hay alguna petición en curso sobre la tarea: el campo no se edita. */
   busy: boolean
+  /** Hay alguna escritura en curso sobre la tarea (valor del último render). */
+  writing: boolean
   /** Para errores que llegan con el panel ya cerrado: se avisan en la página. */
   onError: (message: string) => void
 }
@@ -54,6 +58,7 @@ export function TaskPanel({
   writeVersion,
   isWriting,
   busy,
+  writing,
   onError,
 }: TaskPanelProps) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -85,18 +90,22 @@ export function TaskPanel({
   }, [task.dueDate])
 
   // Al abrir se pide la tarea: el veredicto de la lista puede ser de ayer.
+  // Solo vale una lectura emitida y respondida sin escrituras de por medio;
+  // si no, se repite cuando terminen. Hasta entonces se muestra «Cargando…»,
+  // nunca un veredicto que puede ser viejo (aunque la escritura falle).
+  const [attempt, setAttempt] = useState(0)
   useEffect(() => {
+    if (status !== 'loading' || isWriting()) return
     let cancelled = false
     const issuedAt = writeVersion()
-    // Una lectura emitida con una escritura en vuelo puede llegar con datos de
-    // antes de esa escritura: la lista ya recibirá la respuesta de la escritura.
-    const writingAtIssue = isWriting()
     run(() => api.getTask(token, task.id))
       .then((fresh) => {
         if (cancelled) return
-        // Si mientras tanto se escribió en la tarea, esta lectura es vieja: la
-        // lista ya tiene lo que devolvió esa escritura.
-        if (!writingAtIssue && writeVersion() === issuedAt) onTask(fresh)
+        if (writeVersion() !== issuedAt) {
+          setAttempt((current) => current + 1)
+          return
+        }
+        onTask(fresh)
         setStatus('ready')
       })
       .catch((error: unknown) => {
@@ -111,11 +120,11 @@ export function TaskPanel({
     return () => {
       cancelled = true
     }
-    // Dependencias vacías a propósito: solo se lee al abrir, y el panel se
-    // monta de nuevo en cada apertura (se desmonta al cerrar). Las respuestas
-    // posteriores llegan por `onTask`.
+    // Se relanza al terminar una escritura (`writing`) o tras descartar una
+    // lectura vieja (`attempt`). Las demás dependencias son estables para este
+    // panel, que se monta de nuevo en cada apertura.
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [status, writing, attempt])
 
   const save = async (dueDate: string | null) => {
     // Guarda síncrona: con una escritura en vuelo sobre la tarea (fecha o
@@ -156,8 +165,17 @@ export function TaskPanel({
   // Se confirma al salir del campo o con Intro, nunca mientras se escribe:
   // así no se guardan fechas intermedias al teclear el año cifra a cifra.
   const commit = (input: HTMLInputElement) => {
-    // Con un guardado en vuelo se ignora cualquier otra confirmación.
-    if (isWriting()) return
+    // Con una escritura en vuelo no se envía otra confirmación. Si lo escrito
+    // difiere de lo guardado, se avisa y se devuelve el campo a la fecha
+    // guardada, para que nada parezca guardado sin estarlo.
+    if (isWriting()) {
+      if (input.validity.badInput || draft !== savedRef.current) {
+        setDateError(WAIT_FOR_SAVE)
+        setDraft(savedRef.current)
+        input.value = savedRef.current
+      }
+      return
+    }
     const incomplete = input.validity.badInput
     if (!incomplete && draft === savedRef.current) return
 

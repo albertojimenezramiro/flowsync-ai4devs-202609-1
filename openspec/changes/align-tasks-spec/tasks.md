@@ -6,14 +6,23 @@
 
 ## 2. Envío único de la fecha (frontend)
 
-- [x] 2.1 En `frontend/src/components/task-panel.tsx`:
-  - Añadir la guarda `savingRef` (`useRef<boolean>`). `commit()` no hace nada mientras esté activa, y `save()` la activa al empezar y la desactiva en `finally`, con un comentario que explique por qué ahí.
+- [x] 2.1 Guarda de escritura por tarea:
+  - En `frontend/src/pages/tasks-page.tsx`, un contador síncrono `writesInFlight` que `run()` sube y baja.
+  - En `frontend/src/components/task-panel.tsx`:
+    - `commit()` y `save()` no envían con una escritura en vuelo, y avisan si lo escrito difiere de lo guardado.
+    - El campo y «Quitar fecha» quedan inactivos con cualquier petición en curso.
+    - La lectura de apertura espera o se repite si hubo escrituras.
+
+  La primera versión, con `savingRef` en el panel, se sustituyó tras la revisión de la implementación.
 
   Verificar con `npm run build` y `npm run lint`, y en Chrome headless:
   - Escribir una fecha, pulsar Intro y hacer clic fuera mientras la respuesta del `PATCH` está retrasada genera **un solo** `PATCH`.
   - Con Intro con una fecha A y el `PATCH` retrasado, intentar editar el campo a B y hacer clic fuera no genera un segundo `PATCH`.
   - Tras un fallo, volver a confirmar la fecha sí la reenvía.
   - Con una fecha a medio escribir, pulsar «Cerrar» no envía nada ni muestra avisos, y la tarea conserva su fecha.
+  - Reabrir con un guardado en vuelo muestra «Cargando…», no envía un segundo `PATCH` y después enseña la fecha guardada.
+  - Durante un cambio de estado, el campo y «Quitar fecha» están inactivos y se reactivan al terminar.
+  - Abrir durante un cambio de estado que falla muestra «Cargando…» y después el veredicto de una lectura nueva, nunca el de la lista.
   - Las comprobaciones de pantalla existentes del panel siguen pasando.
 
 ## 3. Comprobación de lo que la spec ahora documenta

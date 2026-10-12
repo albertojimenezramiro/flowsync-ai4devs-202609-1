@@ -151,7 +151,11 @@ export function TasksPage() {
     try {
       return await action()
     } finally {
-      if (write) writes.set(id, (writes.get(id) ?? 1) - 1)
+      if (write) {
+        const left = (writes.get(id) ?? 1) - 1
+        if (left > 0) writes.set(id, left)
+        else writes.delete(id)
+      }
       bump(id, -1)
     }
   }
@@ -328,6 +332,7 @@ export function TasksPage() {
                         writeVersions.current.get(task.id) ?? 0
                       }
                       isWriting={() => isWriting(task.id)}
+                      writing={isWriting(task.id)}
                       busy={isBusy(task.id)}
                       onError={setNotice}
                     />

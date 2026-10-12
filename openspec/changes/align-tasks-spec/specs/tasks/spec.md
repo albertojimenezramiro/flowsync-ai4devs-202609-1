@@ -33,7 +33,7 @@ Abrir y recorrer la lista SHALL NOT cambiar el estado, el responsable ni la fech
 - **THEN** todas las tareas conservan su estado, su responsable y su fecha de vencimiento
 
 ### Requirement: Abrir una tarea desde su fila
-Cada fila de la lista SHALL tener un control «Abrir» que despliega bajo ella el panel de esa tarea, y que pasa a «Cerrar» para plegarlo. El control SHALL ser operable con teclado y anunciar si el panel está abierto. Al abrirlo, el panel SHALL pedir la tarea al servidor y, hasta recibirla, SHALL mostrar «Cargando…» sin fecha ni veredicto. Si la petición falla, SHALL mostrar «No se pudo abrir la tarea.» seguido del motivo, sin fecha ni veredicto. Abrir y cerrar SHALL NOT modificar la tarea por sí mismos. Si al cerrarla, o al abrir otra tarea, el campo de fecha tiene una fecha completa y válida distinta de la guardada, ese gesto la confirma (ver «Poner, cambiar y quitar la fecha en el panel»); si tiene una fecha incompleta o inválida, se descarta, no queda ningún aviso tras cerrarse y la tarea conserva su fecha.
+Cada fila de la lista SHALL tener un control «Abrir» que despliega bajo ella el panel de esa tarea, y que pasa a «Cerrar» para plegarlo. El control SHALL ser operable con teclado y anunciar si el panel está abierto. Al abrirlo, el panel SHALL pedir la tarea al servidor y, hasta recibirla, SHALL mostrar «Cargando…» sin fecha ni veredicto. Si hay una escritura en curso sobre la tarea, o la hubo mientras se leía, la lectura SHALL repetirse cuando termine, y el panel SHALL seguir en «Cargando…» hasta tener una respuesta posterior a todas ellas, aunque la escritura falle. Si la petición falla, SHALL mostrar «No se pudo abrir la tarea.» seguido del motivo, sin fecha ni veredicto. Abrir y cerrar SHALL NOT modificar la tarea por sí mismos. Si al cerrarla, o al abrir otra tarea, el campo de fecha tiene una fecha completa y válida distinta de la guardada, ese gesto la confirma (ver «Poner, cambiar y quitar la fecha en el panel»); si tiene una fecha incompleta o inválida, se descarta, no queda ningún aviso tras cerrarse y la tarea conserva su fecha.
 
 #### Scenario: Abrir y cerrar
 - **WHEN** la persona pulsa «Abrir» en una fila y después «Cerrar»
@@ -55,12 +55,16 @@ Cada fila de la lista SHALL tener un control «Abrir» que despliega bajo ella e
 - **WHEN** la lista se cargó antes de que una tarea pasara a estar vencida y la persona la abre después
 - **THEN** el panel muestra «Cargando…» y luego «Vencida», sin mostrar en ningún momento el veredicto anterior
 
+#### Scenario: Abrir durante un cambio de estado
+- **WHEN** la persona abre una tarea mientras su cambio de estado está en curso, y ese cambio falla
+- **THEN** el panel muestra «Cargando…» hasta que termina el cambio y después el veredicto que da una lectura nueva, nunca el que tenía la lista
+
 #### Scenario: Fallo al abrir
 - **WHEN** la persona abre una tarea y el servidor no responde
 - **THEN** el panel muestra «No se pudo abrir la tarea.» con el motivo, sin campo de fecha ni veredicto
 
 ### Requirement: Poner, cambiar y quitar la fecha en el panel
-El panel SHALL ofrecer un campo «Fecha de vencimiento» que, sin botón de guardar, guarda la fecha cuando la persona confirma el campo: al salir de él (incluido al cerrar la tarea) o al pulsar Intro. Mientras escribe no SHALL enviarse nada. Mientras haya una escritura en curso sobre la tarea (de su fecha o de su estado), ninguna otra confirmación de fecha ni «Quitar fecha» SHALL enviarse, aunque la tarea se haya cerrado y vuelto a abrir, y el campo y «Quitar fecha» SHALL quedar inactivos hasta que termine. Tras un fallo, volver a confirmar SHALL reenviar la fecha. Si la tarea tiene fecha, SHALL ofrecer un botón «Quitar fecha» que la quita sin confirmación. El resultado SHALL verse en el panel en cuanto el servidor lo confirma, sin recargar ni volver a abrir. Al confirmar una fecha incompleta, inválida o con año de más de cuatro cifras, SHALL mostrar «Introduce una fecha completa y válida.» junto al campo, no SHALL enviarse nada y el campo SHALL volver a la fecha guardada. Vaciar el campo no quita la fecha. Si el servidor rechaza el cambio, SHALL mostrarse junto al campo «No se pudo guardar la fecha.» seguido del motivo y SHALL conservarse la fecha anterior.
+El panel SHALL ofrecer un campo «Fecha de vencimiento» que, sin botón de guardar, guarda la fecha cuando la persona confirma el campo: al salir de él (incluido al cerrar la tarea) o al pulsar Intro. Mientras escribe no SHALL enviarse nada. Mientras haya una escritura en curso sobre la tarea (de su fecha o de su estado), ninguna otra confirmación de fecha ni «Quitar fecha» SHALL enviarse, aunque la tarea se haya cerrado y vuelto a abrir, y el campo y «Quitar fecha» SHALL quedar inactivos hasta que termine. Si aun así llega una confirmación con una fecha distinta de la guardada, SHALL mostrarse «Hay otro cambio guardándose. Espera a que termine y vuelve a intentarlo.» y el campo SHALL volver a la fecha guardada. Tras un fallo, volver a confirmar SHALL reenviar la fecha. Si la tarea tiene fecha, SHALL ofrecer un botón «Quitar fecha» que la quita sin confirmación. El resultado SHALL verse en el panel en cuanto el servidor lo confirma, sin recargar ni volver a abrir. Al confirmar una fecha incompleta, inválida o con año de más de cuatro cifras, SHALL mostrar «Introduce una fecha completa y válida.» junto al campo, no SHALL enviarse nada y el campo SHALL volver a la fecha guardada. Vaciar el campo no quita la fecha. Si el servidor rechaza el cambio, SHALL mostrarse junto al campo «No se pudo guardar la fecha.» seguido del motivo y SHALL conservarse la fecha anterior.
 
 #### Scenario: Poner una fecha
 - **WHEN** la persona abre una tarea sin fecha y elige el 20 de octubre de 2026
@@ -76,7 +80,7 @@ El panel SHALL ofrecer un campo «Fecha de vencimiento» que, sin botón de guar
 
 #### Scenario: Reabrir con un guardado en curso
 - **WHEN** la persona confirma una fecha, cierra la tarea y la vuelve a abrir antes de que responda el servidor
-- **THEN** el campo está inactivo hasta que termina ese guardado, después muestra la fecha guardada y no se envía ningún segundo guardado
+- **THEN** el panel muestra «Cargando…» hasta que termina ese guardado, después la fecha guardada (o, si falló, el aviso en la página y la fecha anterior) y no se envía ningún segundo guardado
 
 #### Scenario: Fecha durante un cambio de estado
 - **WHEN** hay en curso un cambio de estado de la tarea abierta
