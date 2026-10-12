@@ -276,7 +276,7 @@ Cada fila SHALL permitir cambiar el estado de su tarea con un solo gesto, sin ab
 - **THEN** ve exactamente «Pendiente», «En curso» y «Hecho», y la tarea queda siempre en uno de ellos
 
 #### Scenario: Petición en curso
-- **WHEN** hay en curso un cambio de estado de una tarea, o la tarea abierta se está cargando o guardando su fecha
+- **WHEN** hay en curso cualquier petición sobre una tarea (un cambio de estado, la carga de su panel o el guardado de su fecha), esté la tarea abierta o ya cerrada
 - **THEN** los botones de estado de su fila están deshabilitados hasta que termina
 
 #### Scenario: El servidor rechaza el cambio
@@ -284,7 +284,7 @@ Cada fila SHALL permitir cambiar el estado de su tarea con un solo gesto, sin ab
 - **THEN** la fila vuelve a mostrar el estado que tenía y la persona ve «No se pudo guardar el cambio de estado.» seguido del motivo (por ejemplo, que no se pudo conectar con el servidor)
 
 ### Requirement: Mirar la lista no cambia nada
-Abrir y recorrer la lista SHALL NOT cambiar el estado, el responsable ni la fecha de vencimiento de ninguna tarea.
+Cargar y recorrer la lista sin pulsar ningún control SHALL NOT cambiar el estado, el responsable ni la fecha de vencimiento de ninguna tarea.
 
 #### Scenario: Solo mirar
 - **WHEN** una persona abre la lista y la recorre sin pulsar nada
@@ -399,7 +399,7 @@ El sistema SHALL responder a `GET /api/v1/tasks/:id`, con `:id` entero positivo 
 - **THEN** la respuesta es `401`
 
 ### Requirement: Abrir una tarea desde su fila
-Cada fila de la lista SHALL tener un control «Abrir» que despliega bajo ella el panel de esa tarea, y que pasa a «Cerrar» para plegarlo. El control SHALL ser operable con teclado y anunciar si el panel está abierto. Al abrirlo, el panel SHALL pedir la tarea al servidor y, hasta recibirla, SHALL mostrar «Cargando…» sin fecha ni veredicto. Si hay una escritura en curso sobre la tarea, o la hubo mientras se leía, la lectura SHALL repetirse cuando termine, y el panel SHALL seguir en «Cargando…» hasta tener una respuesta posterior a todas ellas, aunque la escritura falle. Si la petición falla, SHALL mostrar «No se pudo abrir la tarea.» seguido del motivo, sin fecha ni veredicto. Abrir y cerrar SHALL NOT modificar la tarea por sí mismos. Si al cerrarla, o al abrir otra tarea, el campo de fecha tiene una fecha completa y válida distinta de la guardada, ese gesto la confirma (ver «Poner, cambiar y quitar la fecha en el panel»); si tiene una fecha incompleta o inválida, se descarta, no queda ningún aviso tras cerrarse y la tarea conserva su fecha.
+Cada fila de la lista SHALL tener un control «Abrir» que despliega bajo ella el panel de esa tarea, y que pasa a «Cerrar» para plegarlo. El control SHALL ser operable con teclado y anunciar si el panel está abierto. Al abrirlo, el panel SHALL pedir la tarea al servidor y, hasta recibirla, SHALL mostrar «Cargando…» sin fecha ni veredicto. Si hay una escritura en curso sobre la tarea, o la hubo mientras se leía, la lectura SHALL repetirse cuando termine, y el panel SHALL seguir en «Cargando…» hasta tener una respuesta posterior a todas ellas, aunque la escritura falle. Si la petición falla, SHALL mostrar «No se pudo abrir la tarea.» seguido del motivo, sin fecha ni veredicto. Abrir y cerrar SHALL NOT modificar la tarea por sí mismos. Si al cerrarla, o al abrir otra tarea, el campo de fecha tiene una fecha completa y válida distinta de la guardada, ese gesto la confirma (ver «Poner, cambiar y quitar la fecha en el panel»), salvo que haya una escritura en curso sobre la tarea: entonces la fecha no se guarda y la página SHALL avisar «No se guardó la fecha porque había otro cambio guardándose. Ábrela y vuelve a ponerla.»; si tiene una fecha incompleta o inválida, se descarta, no queda ningún aviso tras cerrarse y la tarea conserva su fecha.
 
 #### Scenario: Abrir y cerrar
 - **WHEN** la persona pulsa «Abrir» en una fila y después «Cerrar»
@@ -412,6 +412,10 @@ Cada fila de la lista SHALL tener un control «Abrir» que despliega bajo ella e
 #### Scenario: Cerrar con una fecha a medias
 - **WHEN** la persona deja el campo de fecha a medio escribir y pulsa «Cerrar» o abre otra tarea
 - **THEN** no se envía nada, una vez cerrada no queda ningún aviso en la página y la tarea conserva la fecha que tenía
+
+#### Scenario: Cerrar con una fecha válida durante otra escritura
+- **WHEN** la persona escribe una fecha completa y válida y cierra la tarea, o abre otra, mientras se está guardando un cambio de estado de esa tarea
+- **THEN** la fecha no se guarda, la tarea conserva la que tenía y la página muestra «No se guardó la fecha porque había otro cambio guardándose. Ábrela y vuelve a ponerla.»
 
 #### Scenario: Con teclado
 - **WHEN** la persona llega al control con el tabulador y lo activa con Intro o espacio
