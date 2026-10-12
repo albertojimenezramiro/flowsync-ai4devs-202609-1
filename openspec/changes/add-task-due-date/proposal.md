@@ -24,8 +24,8 @@ Hoy una tarea no puede llevar fecha, así que nadie puede comprometerse con un p
   - La representación de una tarea gana `dueDate` e `isOverdue`. Antes, la spec prohibía exponer fecha alguna.
   - `POST /api/v1/tasks` deja de ignorar `dueDate`.
 - **Interfaz**:
-  - Cada fila de la lista puede **abrirse** con un panel desplegable en la propia fila, operable con teclado.
-  - El panel muestra el campo de fecha, que se guarda al cambiar sin botón de guardar, un botón «Quitar fecha» sin confirmación y la señal «Vencida» con texto, no solo color.
+  - Cada fila de la lista puede **abrirse** con un panel desplegable en la propia fila, operable con teclado. Solo puede haber una tarea abierta a la vez, y el panel muestra «Cargando…» hasta tener el veredicto fresco del servidor.
+  - El panel muestra el campo de fecha, que se guarda al confirmarlo (al salir del campo o con Intro) sin botón de guardar, un botón «Quitar fecha» sin confirmación y la señal «Vencida» con texto, no solo color.
   - Con la fila **cerrada**, la lista sigue mostrando solo título, responsable y estado: ni fecha ni marca de vencida.
   - El formulario de creación no cambia y no ofrece fecha.
   - El frontend envía `X-Timezone` en todas las peticiones.
@@ -43,10 +43,13 @@ Hoy una tarea no puede llevar fecha, así que nadie puede comprometerse con un p
 ### Modified Capabilities
 - `tasks`: cambian estos requisitos:
   - La forma pública de una tarea gana `dueDate` e `isOverdue`.
-  - La creación acepta `dueDate`.
-  - La actualización acepta `dueDate`, incluido quitarla.
+  - «Las tareas exigen sesión» pasa de tres operaciones a cuatro.
+  - En «Listado de la lista compartida», solo `isOverdue` puede diferir entre personas.
+  - «Creación con solo el título» se **renombra** a «Creación de una tarea», porque acepta `dueDate`. La interfaz sigue pidiendo solo el título.
+  - La actualización acepta `dueDate`, incluido quitarla con `dueDate` como único campo.
   - La superficie de la API gana la lectura individual.
-  - La fila de la lista puede abrirse sin mostrar fecha mientras está cerrada.
+  - La fila de la lista gana el control «Abrir» y no muestra fecha mientras está cerrada.
+  - El cambio de estado desde la fila adopta la respuesta del servidor y se bloquea mientras haya otra petición sobre esa tarea.
 
   Se añaden requisitos nuevos para la regla de vencimiento, el día de referencia por zona, la validación de la fecha y el panel de la tarea abierta.
 

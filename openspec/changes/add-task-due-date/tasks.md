@@ -16,21 +16,26 @@
   - mañana;
   - sin fecha;
   - `done` con la fecha pasada.
-- [ ] 2.2 Crear el helper `referenceDate(request)`:
-  - Con `X-Timezone` válida, devuelve la fecha de hoy en esa zona.
-  - Sin cabecera, devuelve la fecha de hoy en UTC.
-  - Con zona inválida, lanza un error de validación `422`.
+- [ ] 2.2 Crear el helper `referenceDate(request)` en `app/helpers/reference_date.ts`:
+  - Con un nombre IANA válido (forma de nombre más `IANAZone.isValidZone`), devuelve la fecha de hoy en esa zona.
+  - Sin cabecera o con la cabecera vacía, devuelve la fecha de hoy en UTC.
+  - Con un desfase (`+02:00`), un nombre inexistente o varias cabeceras, lanza un error de validación `422` sobre `X-Timezone`.
 
   Verificar con `npm run typecheck`.
 
 ## 3. API (backend)
 
-- [ ] 3.1 Extraer el builder `dueDate()` (cadena `YYYY-MM-DD`, regla `calendarDate`, `.nullable().optional()`) y usarlo en `createTaskValidator` y `updateTaskValidator`. En este último, `requiredIfMissing` cruzado entre los tres campos. Verificar con `npm run typecheck`.
+- [ ] 3.1 Extraer el builder `dueDate()` (cadena `YYYY-MM-DD`, regla `calendarDate`, `.nullable().optional()`) y usarlo en `createTaskValidator` y `updateTaskValidator`. En este último, los tres campos son `optional()` y se **quita `requiredIfMissing`**, porque trata `null` como ausente e impediría quitar la fecha sola. Verificar con `npm run typecheck`.
 - [ ] 3.2 Cambiar `TaskTransformer` para que reciba `today` y exponga `dueDate` (`YYYY-MM-DD` o `null`) e `isOverdue`. Verificar con `npm run typecheck`.
 - [ ] 3.3 Actualizar `TasksController`:
   - Resolver `today` al principio de cada acción, antes de validar o escribir.
   - `store` acepta `dueDate`.
-  - `update` aplica `dueDate` cuando viene en el cuerpo, con `null` como quitar.
+  - `update` hace tres cosas, en este orden:
+    1. Rechaza un `null` explícito en `status` y `assigneeId`.
+    2. Valida.
+    3. Si `status`, `assigneeId` y `dueDate` son todos `undefined`, devuelve `422` con un `required` para cada uno.
+
+    Después aplica `dueDate` si no es `undefined`, con `null` como quitar.
   - Nueva acción `show` con `findOrFail` y `load('assignee')`.
 
   Verificar con `npm run typecheck`.
@@ -42,8 +47,9 @@
 - [ ] 3.5 Comprobar con `curl` los escenarios de API de `specs/tasks/spec.md`:
   - Todas las respuestas (listar, leer, crear y actualizar) traen `dueDate` e `isOverdue`.
   - Crear sin fecha da `null` y `false`. Crear con fecha pasada da `201` y `true`.
-  - Poner, cambiar y quitar la fecha, tanto con `null` como con `""`.
-  - Las fechas `2026-02-30`, `2026-10`, `20/10/2026`, `2026-10-20T10:00:00Z` y numéricas dan `422`, y la fecha se conserva.
+  - Poner, cambiar y quitar la fecha, tanto con `null` como con `""`, enviando `dueDate` **como único campo**.
+  - `{}` y `{ "isOverdue": true }` dan `422`.
+  - Las fechas `2026-02-30`, `2027-02-29`, `2026-10`, `20/10/2026`, `2026-10-20T10:00:00Z`, `12026-10-20` y numéricas dan `422`, y la fecha se conserva. `2028-02-29` se acepta.
   - Regla de vencimiento (cada caso con `X-Timezone` y fechas calculadas a partir de hoy):
     - Ayer da `true`; hoy y mañana dan `false`.
     - Sin fecha da `false`.
@@ -52,8 +58,9 @@
     - Volver de `done` da `true`.
     - Aplazar la fecha da `false`.
     - Reasignar no cambia la fecha ni el veredicto.
-  - Dos zonas, dos veredictos: una tarea que vence hoy en UTC−12 y ayer en UTC+14 (`Etc/GMT+12` frente a `Pacific/Kiritimati`) da veredictos distintos en la misma petición repetida.
-  - Sin cabecera se usa UTC. `X-Timezone: Marte/Olympus` da `422` y no crea ni cambia nada.
+  - Dos zonas, dos veredictos: con fecha igual a hoy en `Etc/GMT+12`, la lectura con `Etc/GMT+12` da `false` y la lectura con `Pacific/Kiritimati` da `true`. Esto también cubre «Vence sola al cambiar el día», usando la zona como día de referencia posterior.
+  - Sin cabecera, o con la cabecera vacía, se usa UTC.
+  - `X-Timezone: Marte/Olympus` y `X-Timezone: +02:00` dan `422`, también en un `POST` con `dueDate` y en un `PATCH`, sin crear ni cambiar nada.
   - `isOverdue` enviado se ignora.
   - `GET /tasks/:id` responde `200`, también con tareas ajenas. `999999`, `01` y `abc` dan `404`. Sin token da `401`.
   - `DELETE` da `404`.
@@ -71,29 +78,39 @@
 
 ## 5. Panel de la tarea (frontend)
 
-- [ ] 5.1 Añadir a cada fila el botón «Abrir» / «Cerrar» con `aria-expanded` y `aria-controls`, y el estado `openIds`. Con la fila cerrada no se pinta nada de fecha. Verificar en el navegador:
+- [ ] 5.1 Añadir a cada fila el botón «Abrir» / «Cerrar» con `aria-expanded` y `aria-controls`, y el estado `openId`, con una sola tarea abierta a la vez. El panel se desmonta al cerrarse. Verificar en el navegador:
   - Abre y cierra con ratón y con teclado (Tab más Intro o espacio).
-  - Con todas las filas cerradas no aparece ninguna fecha ni «Vencida», aunque haya tareas vencidas.
-- [ ] 5.2 Crear el panel. Al abrirse llama a `getTask` y actualiza la tarea. Muestra:
-  - `Label` «Fecha de vencimiento» con un `Input type="date"`.
-  - «Quitar fecha», solo si la tarea tiene fecha.
-  - «Vencida» como texto con icono, solo si `isOverdue`.
-
-  Verificar en el navegador que una tarea vencida muestra «Vencida», que una que vence hoy no lo muestra, y que una sin fecha muestra el campo vacío sin ningún aviso.
-- [ ] 5.3 Guardado sin botón:
-  - Una fecha completa se envía con `updateTaskDueDate` y se pinta la respuesta.
-  - Una fecha incompleta o borrada muestra «Introduce una fecha completa y válida.» sin enviar nada.
-  - «Quitar fecha» envía `null`, sin confirmación.
-  - Si el servidor falla, el campo vuelve a la fecha guardada y se muestra el motivo junto al campo.
-  - Controles deshabilitados mientras se envía.
+  - Abrir otra tarea cierra la anterior.
+  - Con todas cerradas no hay ninguna fecha ni «Vencida» en el DOM, aunque haya tareas vencidas, ni tras abrir y cerrar una.
+- [ ] 5.2 Crear `components/task-panel.tsx`:
+  - Al montarse llama a `getTask`, mostrando «Cargando…» sin veredicto mientras tanto.
+  - Si falla, muestra «No se pudo abrir la tarea.» con el motivo.
+  - Si va bien, actualiza la tarea en la lista y muestra el `Label` «Fecha de vencimiento» con un `Input type="date"`, «Quitar fecha» (solo si hay fecha) y «Vencida» como texto con icono (solo si `isOverdue`).
 
   Verificar en el navegador:
-  - Poner una fecha la muestra al instante y se conserva al recargar y volver a abrir.
-  - Una fecha pasada muestra «Vencida» al instante.
+  - Una tarea vencida muestra «Vencida».
+  - Una que vence hoy no lo muestra.
+  - Una sin fecha muestra el campo vacío sin avisos.
+  - Con la respuesta de `getTask` retrasada (puppeteer), se ve «Cargando…» y nunca el veredicto viejo.
+  - Con `getTask` abortada aparece «No se pudo abrir la tarea.».
+- [ ] 5.3 Guardado al confirmar:
+  - `onChange` solo actualiza `draft`. Se confirma en `onBlur` e Intro.
+  - Una fecha completa distinta de la guardada se envía con `updateTaskDueDate` y se pinta la respuesta.
+  - Una fecha incompleta, vacía o con año de cinco cifras muestra «Introduce una fecha completa y válida.» sin enviar nada, y `draft` vuelve a la fecha guardada.
+  - «Quitar fecha» envía `null` sin confirmación.
+  - Si el servidor falla, se muestra «No se pudo guardar la fecha.» con el motivo y se conserva la fecha anterior.
+  - El input se deshabilita solo mientras se guarda.
+
+  Verificar en el navegador:
+  - Teclear un año cifra a cifra no genera ningún `PATCH` hasta salir del campo, y entonces genera uno.
+  - Escribir una fecha y pulsar «Cerrar» la guarda; al reabrir, aparece.
+  - Una fecha pasada muestra «Vencida» tras confirmar.
   - Quitar la fecha borra «Vencida» sin diálogo.
-  - Con una fecha a medio escribir aparece el aviso y no hay petición.
-  - Con el backend parado, la fecha guardada se conserva y aparece el motivo.
-- [ ] 5.4 Hacer que el cambio de estado desde la fila, al recibir la respuesta del `PATCH`, reemplace la tarea con la del servidor. Verificar en el navegador que, con el panel de una tarea vencida abierto, pasarla a «Hecho» quita «Vencida» y conserva la fecha, y que volver a «Pendiente» la muestra vencida otra vez.
+  - Vaciar el campo o dejarlo a medias muestra el aviso y conserva la fecha.
+  - Con el backend parado, la fecha se conserva y aparece el motivo.
+- [ ] 5.4 Ampliar `savingIds` a toda petición sobre una tarea (apertura, fecha y estado), deshabilitando los botones de estado y «Quitar fecha» mientras dure. Hacer que el cambio de estado, al recibir la respuesta del `PATCH`, reemplace la tarea con la del servidor. Verificar en el navegador:
+  - Durante la carga del panel o el guardado de la fecha, los botones de estado de esa fila están deshabilitados.
+  - Con el panel de una tarea vencida abierto, pasarla a «Hecho» quita «Vencida» y conserva la fecha, y volver a «Pendiente» la muestra vencida otra vez.
 - [ ] 5.5 Ejecutar `npm run build` y `npm run lint` en `frontend/` sin errores.
 
 ## 6. Integración
