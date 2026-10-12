@@ -73,6 +73,9 @@ export function TaskPanel({
   // Última fecha confirmada por el servidor, actualizada en cuanto responde:
   // un blur que llegue antes del siguiente render no debe reenviarla.
   const savedRef = useRef(saved)
+  // Fecha que este panel está guardando ahora mismo (null si ninguna): una
+  // segunda confirmación de esa misma fecha no es un conflicto.
+  const sendingRef = useRef<string | null>(null)
   useEffect(() => {
     savedRef.current = saved
   }, [saved])
@@ -131,6 +134,7 @@ export function TaskPanel({
     // estado) no se lanza otra. Cubre también «Quitar fecha».
     if (isWriting()) return
     setDateError(null)
+    sendingRef.current = dueDate
     setSaving(true)
     try {
       const updated = await run(
@@ -158,6 +162,7 @@ export function TaskPanel({
       // fallo (un fallo debe poder reintentarse). Tras un éxito, `savedRef` ya
       // tiene la fecha guardada antes de que pueda llegar otro evento, así que
       // un blur anterior al siguiente render no la reenvía.
+      sendingRef.current = null
       if (mounted.current) setSaving(false)
     }
   }
@@ -169,6 +174,8 @@ export function TaskPanel({
     // difiere de lo guardado, se avisa y se devuelve el campo a la fecha
     // guardada, para que nada parezca guardado sin estarlo.
     if (isWriting()) {
+      // Intro y luego salir del campo: es la misma fecha que ya se envía.
+      if (!input.validity.badInput && draft === sendingRef.current) return
       if (input.validity.badInput || draft !== savedRef.current) {
         setDateError(WAIT_FOR_SAVE)
         setDraft(savedRef.current)
