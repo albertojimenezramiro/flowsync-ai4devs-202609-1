@@ -85,6 +85,12 @@ export function TaskPanel({
     savedRef.current = saved
   }, [saved])
 
+  // Solo se avisa al cerrar si el conflicto sigue vivo: cuando termina la
+  // escritura que causó el descarte, el aviso del panel ya lo explicó.
+  useEffect(() => {
+    if (!writing) discardedRef.current = false
+  }, [writing])
+
   useEffect(() => {
     mounted.current = true
     return () => {
@@ -141,6 +147,9 @@ export function TaskPanel({
     // Guarda síncrona: con una escritura en vuelo sobre la tarea (fecha o
     // estado) no se lanza otra. Cubre también «Quitar fecha».
     if (isWriting()) return
+    // Cualquier guardado, incluido «Quitar fecha», sustituye a la fecha
+    // descartada: ya no hay nada pendiente de avisar.
+    discardedRef.current = false
     setDateError(null)
     sendingRef.current = dueDate
     setSaving(true)

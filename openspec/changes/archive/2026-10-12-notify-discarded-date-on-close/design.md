@@ -30,6 +30,10 @@ Al pulsar «Cerrar» o «Abrir» en otra fila, el blur ocurre en el `mousedown` 
 - **Si el panel sigue abierto, solo se ve el aviso del panel**, como hoy. Si después la persona cierra sin volver a tocar el campo, también aparece el aviso de página: la fecha que escribió no se guardó, así que el aviso sigue siendo cierto.
 - **Las fechas incompletas no activan la marca**, para respetar «se descarta y no queda ningún aviso tras cerrarse».
 
+### Ajustes tras la revisión adversarial
+- `discardedRef` se limpia también al empezar cualquier guardado, incluido «Quitar fecha», y cuando termina la escritura que causó el descarte (efecto sobre `writing`). Así solo se avisa si el conflicto sigue vivo al cerrar.
+- El aviso va a un estado propio de la página (`dateNotice`), separado de `notice`, para que el error de un cambio de estado posterior no lo pise. Se borra al volver a abrir una tarea. El aviso de «No se pudo guardar la fecha.» con la tarea cerrada usa el mismo canal.
+
 ## Risks / Trade-offs
 
 - [Aviso de página tras haber visto ya el del panel] → Es redundante pero cierto. Se acepta por simplicidad.
