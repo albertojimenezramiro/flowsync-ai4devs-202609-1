@@ -56,6 +56,16 @@ export function TaskPanel({
   const [isSaving, setSaving] = useState(false)
   const mounted = useRef(true)
   const inputRef = useRef<HTMLInputElement>(null)
+  // Guarda síncrona: hay un guardado de fecha en vuelo. `isSaving` no basta
+  // porque no se refleja hasta el siguiente render, y Intro seguido de salir
+  // del campo llegaría a enviar dos veces.
+  const savingRef = useRef(false)
+  // Última fecha confirmada por el servidor, actualizada en cuanto responde:
+  // un blur que llegue antes del siguiente render no debe reenviarla.
+  const savedRef = useRef(saved)
+  useEffect(() => {
+    savedRef.current = saved
+  }, [saved])
 
   useEffect(() => {
     mounted.current = true
@@ -101,11 +111,15 @@ export function TaskPanel({
 
   const save = async (dueDate: string | null) => {
     setDateError(null)
+    savingRef.current = true
     setSaving(true)
     try {
-      onTask(
-        await run(() => api.updateTaskDueDate(token, task.id, dueDate), true),
+      const updated = await run(
+        () => api.updateTaskDueDate(token, task.id, dueDate),
+        true,
       )
+      savedRef.current = updated.dueDate ?? ''
+      onTask(updated)
       if (dueDate === null) inputRef.current?.focus()
     } catch (error) {
       if (!mounted.current) {
@@ -116,6 +130,10 @@ export function TaskPanel({
       setDraft(saved)
       setDateError(saveError(error))
     } finally {
+      // Se libera aquí, tras éxito o fallo: un fallo debe poder reintentarse, y
+      // tras un éxito `savedRef` ya tiene la fecha guardada, así que un blur
+      // anterior al siguiente render no la reenvía.
+      savingRef.current = false
       if (mounted.current) setSaving(false)
     }
   }
@@ -123,8 +141,10 @@ export function TaskPanel({
   // Se confirma al salir del campo o con Intro, nunca mientras se escribe:
   // así no se guardan fechas intermedias al teclear el año cifra a cifra.
   const commit = (input: HTMLInputElement) => {
+    // Con un guardado en vuelo se ignora cualquier otra confirmación.
+    if (savingRef.current) return
     const incomplete = input.validity.badInput
-    if (!incomplete && draft === saved) return
+    if (!incomplete && draft === savedRef.current) return
 
     if (!incomplete && FULL_DATE.test(draft)) {
       void save(draft)

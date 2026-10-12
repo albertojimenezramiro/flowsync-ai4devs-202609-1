@@ -1,7 +1,7 @@
 # tasks Specification
 
 ## Purpose
-Mantener una única lista de tareas compartida por todo el equipo, donde cualquiera crea tareas con solo el título y ve y cambia en qué estado está cada una y quién la lleva.
+Mantener una única lista de tareas compartida por todo el equipo, donde cualquiera crea tareas con solo el título, ve y cambia en qué estado está cada una y quién la lleva, y al abrir una tarea pone, cambia o quita su fecha de vencimiento y ve si está vencida según su propio día.
 
 ## Requirements
 
