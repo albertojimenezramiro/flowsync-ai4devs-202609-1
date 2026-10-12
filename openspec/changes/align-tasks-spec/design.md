@@ -26,7 +26,7 @@ Sobre el envío duplicado, en `frontend/src/components/task-panel.tsx`:
 - **Evitar el envío duplicado con una guarda síncrona.** Un `useRef<boolean>` (`savingRef`) marca que hay un guardado de fecha en vuelo, tanto para poner una fecha como para quitarla.
   - `commit()` no hace nada mientras esté activo.
   - `save()` lo activa al empezar y lo desactiva en `finally`. Se limpia en `finally`, y no antes, para cubrir tanto el éxito como el fallo, que permite reintentar.
-  - Un blur posterior a `finally` ya ve el `draft` sincronizado con la fecha guardada, así que no reenvía nada.
+  - Un blur que llegue después de `finally` pero antes del siguiente render todavía tiene `draft` y `saved` viejos en su cierre. Para que no reenvíe, `commit()` compara con `savedRef`, una referencia a la última fecha confirmada que `save()` actualiza de forma síncrona en cuanto responde el servidor y que se sincroniza con la prop en cada cambio. Esto se añadió durante el apply.
   - Sigue el mismo patrón que `creatingRef` en `tasks-page.tsx`.
   - Alternativa descartada (señalada en la revisión): comparar por valor (`draft === enVuelo`). Si el valor cambiara durante el vuelo, por ejemplo con un selector nativo que ignore `readOnly`, se lanzaría un segundo guardado concurrente.
   - Alternativa descartada: depender de `isSaving`. El estado de React no se refleja hasta el siguiente render, así que no protege frente a dos eventos seguidos.
