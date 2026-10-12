@@ -9,6 +9,8 @@ En `frontend/src/components/task-panel.tsx`, `commit()` corre en el blur y en In
 
 Al pulsar «Cerrar» o «Abrir» en otra fila, el blur ocurre en el `mousedown` y el panel se desmonta en el `click`. El aviso del panel desaparece con él y nadie se entera. El panel ya tiene `onError`, que la página pinta como aviso. Hoy se usa para los guardados que fallan con la tarea cerrada.
 
+**Cuándo ocurre de verdad** (comprobado en el apply): con un clic real en un botón de estado, el foco sale antes del campo, así que la fecha se guarda primero y el cambio de estado es el que queda bloqueado. El descarte solo se da si un cambio de estado empieza mientras el foco sigue en el campo, y luego se cierra la tarea. La interfaz no ofrece hoy un camino de teclado para eso, así que se probó con un `click()` programático. Es un caso raro, pero el aviso evita que se pierda en silencio.
+
 ## Goals / Non-Goals
 
 **Goals:**
