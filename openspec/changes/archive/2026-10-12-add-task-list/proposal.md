@@ -35,7 +35,7 @@ FlowSync solo sabe registrar personas e iniciar sesión: todavía no existe ni u
 - `tasks`: la lista de tareas compartida por todo el equipo. Cubre la creación con solo el título, el estado y el responsable por defecto, el cambio de estado y de responsable, y su presentación en pantalla.
 
 ### Modified Capabilities
-<!-- Ninguna en la spec. La portada pasa de /profile a /tasks, pero la spec viva `auth` se está introduciendo en paralelo (PR aparte) y todavía no está en esta rama; el ajuste de sus requisitos de navegación se hará cuando ambas convivan. -->
+- `auth`: la portada pasa del perfil a la lista de tareas. Cambian los requisitos «Navegación según el estado de sesión», «Pantalla de inicio de sesión» y «Pantalla de registro», que ahora llevan a `/tasks`, y «Pantalla de perfil», que gana el enlace «Tareas del equipo».
 
 ## Impact
 

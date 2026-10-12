@@ -142,19 +142,23 @@ El sistema SHALL responder en JSON a todas las peticiones de autenticación, inc
 - **THEN** la respuesta es un `401` con cuerpo JSON
 
 ### Requirement: Navegación según el estado de sesión
-La aplicación web SHALL ofrecer las pantallas de inicio de sesión (`/login`), registro (`/register`) y perfil (`/profile`). El perfil SHALL ser accesible solo con sesión iniciada; login y registro, solo sin ella. Cualquier otra dirección SHALL llevar al perfil.
+La aplicación web SHALL ofrecer las pantallas de inicio de sesión (`/login`), registro (`/register`), perfil (`/profile`) y lista de tareas (`/tasks`). El perfil y la lista de tareas SHALL ser accesibles solo con sesión iniciada; login y registro, solo sin ella. Cualquier otra dirección SHALL llevar a la lista de tareas.
 
 #### Scenario: Visitante sin sesión entra al perfil
 - **WHEN** una persona sin sesión abre `/profile`
 - **THEN** se la lleva a la pantalla de inicio de sesión
 
+#### Scenario: Visitante sin sesión entra a la lista de tareas
+- **WHEN** una persona sin sesión abre `/tasks`
+- **THEN** se la lleva a la pantalla de inicio de sesión
+
 #### Scenario: Persona con sesión entra a login o registro
 - **WHEN** una persona con sesión abre `/login` o `/register`
-- **THEN** se la lleva a su perfil
+- **THEN** se la lleva a la lista de tareas
 
 #### Scenario: Dirección desconocida
-- **WHEN** se abre una dirección que no es ninguna de las tres pantallas
-- **THEN** se redirige al perfil, y de ahí al login si no hay sesión
+- **WHEN** se abre una dirección que no es ninguna de las cuatro pantallas
+- **THEN** se redirige a la lista de tareas, y de ahí al login si no hay sesión
 
 ### Requirement: Persistencia y restauración de la sesión en el navegador
 La aplicación web SHALL conservar la sesión entre recargas y en las pestañas que se abran después en el mismo navegador; las pestañas ya abiertas no se enteran de un login o logout hecho en otra. La validez de la sesión SHALL comprobarse solo al cargar la aplicación. Al abrirse con una sesión guardada SHALL mostrar un indicador de carga ("Cargando…") hasta confirmar con el servidor que la sesión sigue siendo válida, y solo entonces mostrar la pantalla correspondiente.
@@ -176,11 +180,11 @@ La aplicación web SHALL conservar la sesión entre recargas y en las pestañas 
 - **THEN** la persona ve el login con el aviso "Algo ha ido mal en el servidor. Inténtalo de nuevo en un momento." y la sesión guardada se conserva
 
 ### Requirement: Pantalla de inicio de sesión
-La aplicación web SHALL mostrar en el login un formulario con "Email" y "Contraseña", un botón "Entrar" y un enlace "Crea una" hacia el registro. Al iniciar sesión con éxito SHALL llevar a la persona a su perfil. Mientras se envía, el botón SHALL mostrar "Entrando…" y estar deshabilitado.
+La aplicación web SHALL mostrar en el login un formulario con "Email" y "Contraseña", un botón "Entrar" y un enlace "Crea una" hacia el registro. Al iniciar sesión con éxito SHALL llevar a la persona a la lista de tareas. Mientras se envía, el botón SHALL mostrar "Entrando…" y estar deshabilitado.
 
 #### Scenario: Login correcto
 - **WHEN** la persona introduce credenciales válidas y pulsa "Entrar"
-- **THEN** llega a su perfil
+- **THEN** llega a la lista de tareas
 
 #### Scenario: Credenciales incorrectas
 - **WHEN** la persona introduce un email o contraseña que no corresponden a ninguna cuenta
@@ -195,11 +199,11 @@ La aplicación web SHALL mostrar en el login un formulario con "Email" y "Contra
 - **THEN** ve el motivo en un aviso general, que solo se sustituye si el siguiente intento produce otro aviso general (los errores bajo un campo conviven con él) y que desaparece al iniciar sesión con éxito; el registro no muestra este aviso
 
 ### Requirement: Pantalla de registro
-La aplicación web SHALL mostrar en el registro un formulario con "Nombre completo (opcional)", "Email", "Contraseña" (con la ayuda "Entre 8 y 32 caracteres.") y "Repite la contraseña", un botón "Crear cuenta" y un enlace "Inicia sesión" hacia el login. Al registrarse con éxito SHALL dejar la sesión iniciada y llevar a la persona a su perfil. Mientras se envía, el botón SHALL mostrar "Creando cuenta…" y estar deshabilitado.
+La aplicación web SHALL mostrar en el registro un formulario con "Nombre completo (opcional)", "Email", "Contraseña" (con la ayuda "Entre 8 y 32 caracteres.") y "Repite la contraseña", un botón "Crear cuenta" y un enlace "Inicia sesión" hacia el login. Al registrarse con éxito SHALL dejar la sesión iniciada y llevar a la persona a la lista de tareas. Mientras se envía, el botón SHALL mostrar "Creando cuenta…" y estar deshabilitado.
 
 #### Scenario: Registro correcto
 - **WHEN** la persona rellena el formulario con datos válidos y pulsa "Crear cuenta"
-- **THEN** llega a su perfil con la sesión ya iniciada
+- **THEN** llega a la lista de tareas con la sesión ya iniciada
 
 #### Scenario: Nombre en blanco
 - **WHEN** la persona deja el nombre vacío o solo con espacios
@@ -229,7 +233,7 @@ La aplicación web SHALL mostrar el primer error de validación de cada campo ba
 - **THEN** ve el aviso "Algo ha ido mal en el servidor. Inténtalo de nuevo en un momento."
 
 ### Requirement: Pantalla de perfil
-La aplicación web SHALL mostrar en el perfil las iniciales de la cuenta, su nombre completo (o "Sin nombre" si no tiene), su email y "Miembro desde" con la fecha de alta en formato largo en castellano.
+La aplicación web SHALL mostrar en el perfil las iniciales de la cuenta, su nombre completo (o "Sin nombre" si no tiene), su email y "Miembro desde" con la fecha de alta en formato largo en castellano, y SHALL ofrecer un enlace "Tareas del equipo" hacia la lista de tareas.
 
 #### Scenario: Cuenta con nombre
 - **WHEN** una persona con nombre "Ada Lovelace" abre su perfil
@@ -238,6 +242,10 @@ La aplicación web SHALL mostrar en el perfil las iniciales de la cuenta, su nom
 #### Scenario: Cuenta sin nombre
 - **WHEN** una persona registrada sin nombre abre su perfil
 - **THEN** ve "Sin nombre" en lugar del nombre
+
+#### Scenario: Enlace a la lista de tareas
+- **WHEN** una persona abre su perfil y pulsa "Tareas del equipo"
+- **THEN** llega a la lista de tareas
 
 ### Requirement: Cierre de sesión desde la aplicación
 La aplicación web SHALL ofrecer en el perfil un botón "Cerrar sesión" que cierra la sesión en ese navegador y lleva al login sin mostrar ningún aviso. Mientras se cierra, el botón SHALL mostrar "Cerrando sesión…" y estar deshabilitado. La sesión local SHALL cerrarse aunque el servidor no confirme la revocación.

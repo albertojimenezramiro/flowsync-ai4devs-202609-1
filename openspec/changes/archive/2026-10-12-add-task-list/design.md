@@ -53,7 +53,7 @@ Para la motivación y el alcance, ver proposal.md. Para el contrato, ver `specs/
 - **Rutas**: un grupo `tasks` bajo `/api/v1` con `.use(middleware.auth())`. Contiene exactamente tres rutas:
   - `GET /tasks` → `TasksController.index`.
   - `POST /tasks` → `TasksController.store`.
-  - `PATCH /tasks/:id` → `TasksController.update`.
+  - `PATCH /tasks/:id` → `TasksController.update`, con `.where('id', { match: /^[1-9]\d*$/, cast: Number })`. Sin el matcher, `/tasks/1.0` llegaba a `findOrFail` y SQLite lo convertía en `1`, de modo que una URL distinta modificaba la tarea 1. `router.matchers.number()` (`^\d+$`) no basta, porque deja pasar `/tasks/01`. Con el matcher, solo la forma canónica de un entero positivo llega al controlador; el resto da `404` de ruta.
 - No se usa `router.resource`, que generaría `show` y `destroy`. Se declaran las tres rutas a mano para que la superficie cerrada sea explícita.
 - **index**: `Task.query().preload('assignee')`, **sin `orderBy`**. Es una decisión consciente por PA-3: el orden queda indefinido, sin inventar un criterio. Se documenta en el propio código con un comentario que remite a PA-3.
 - **store**:
@@ -66,7 +66,8 @@ Para la motivación y el alcance, ver proposal.md. Para el contrato, ver `specs/
   - Hace `Task.findOrFail(params.id)`, que da `404` si no existe.
   - Valida con `updateTaskValidator`, que tiene estos campos:
     - `status: vine.enum(TASK_STATUSES).optional().requiredIfMissing('assigneeId')`.
-    - `assigneeId: vine.number().exists({ table: 'users', column: 'id' }).optional().requiredIfMissing('status')`.
+    - `assigneeId: vine.number({ strict: true }).withoutDecimals().positive().exists({ table: 'users', column: 'id' }).optional().requiredIfMissing('status')`.
+  - **`assigneeId` estricto**: sin `strict`, VineJS convierte `true`, `[1]` o `"1e0"` en `1` y reasignaría en silencio a la cuenta 1. Con `strict`, `withoutDecimals` y `positive` solo se acepta un entero positivo JSON. Se pierde aceptar `"7"` (cadena), cosa que ningún cliente propio envía.
   - Aplica solo los campos presentes, guarda, hace `load('assignee')` y responde con `serialize`.
   - Si el cuerpo está vacío, los dos `requiredIfMissing` fallan y devuelven `422`.
   - **`null` explícito**: `optional()` de VineJS acepta `null` y descarta el campo, y el bodyparser convierte `""` en `null`. Así, `{ status: null, assigneeId: 2 }` validaría y se ignoraría `status` en silencio. Para cumplir «cualquier otro valor → 422», antes de validar, `update` comprueba si en el cuerpo crudo (`request.body()`) hay `status` o `assigneeId` presentes con valor `null`. Si los hay, lanza un error de validación de VineJS (`errors.E_VALIDATION_ERROR`) con el campo afectado, para que la respuesta tenga la misma forma `422 { errors }`. Alternativa descartada: un `vine.unionOfTypes` o una regla custom; añade más complejidad para el mismo efecto.
@@ -91,12 +92,14 @@ Para la motivación y el alcance, ver proposal.md. Para el contrato, ver `specs/
   - Formulario de una línea: `Input` y `Button` «Crear tarea».
     - Antes de llamar a la API se valida en cliente: título vacío tras `trim` o de más de 120 caracteres. El mensaje se muestra con `FieldError`.
     - El `Input` **no** lleva `maxLength`, porque el navegador truncaría en silencio.
-    - El botón está deshabilitado hasta que termina la carga inicial. Así se evita que la respuesta del listado pise una tarea recién creada.
+    - El botón está deshabilitado hasta que termina la carga inicial, para que la respuesta del listado no pise una tarea recién creada. También queda deshabilitado si esa carga falla: crear sobre una lista que no se ha podido cargar enseñaría una lista incompleta como si fuera la buena. No hay botón de reintento; basta con recargar.
+    - Una guarda síncrona con `useRef` impide un segundo envío mientras el primero está en vuelo. El estado `isCreating` solo se refleja en el siguiente render y no basta contra dos `submit` seguidos.
     - Al terminar con éxito se añade la tarea devuelta al estado local y se vacía el campo.
   - Lista como `<ul>`. Cada fila muestra el título, el responsable (`assignee.fullName?.trim() || 'Sin nombre'`; el registro no recorta el nombre, así que uno hecho solo de espacios también cuenta como «sin nombre») y un grupo de tres `Button` de tamaño pequeño:
     - Cada botón es un estado.
     - El actual lleva `variant="default"` y `aria-pressed`; los demás, `variant="outline"`.
     - Se usan botones porque no hay `select` de shadcn instalado y no se añaden dependencias. Un `<select>` nativo rompería la estética, y además los tres botones dejan los destinos visibles y cambian el estado con un solo clic.
+  - **Un único aviso de acción** (`notice`): crear y cambiar de estado comparten un solo mensaje, que cada acción limpia al empezar y sustituye si falla. Con mensajes separados combinados con `??`, un error antiguo de creación tapaba uno nuevo de cambio de estado. El error de carga va aparte y tiene prioridad, porque bloquea la pantalla.
   - **Cambio de estado optimista**:
     - Se actualiza la fila en el estado local y se llama a la API.
     - Si falla, se restaura el estado anterior y se muestra un `Alert` con «No se pudo guardar el cambio de estado.» seguido del mensaje de `ApiError` (o, si no es un `ApiError`, solo la primera frase).
@@ -119,7 +122,7 @@ Para la motivación y el alcance, ver proposal.md. Para el contrato, ver `specs/
 - [Optimismo en el cambio de estado: si el usuario cambia y recarga antes de la respuesta, podría ver el valor viejo] → Ventana mínima. El rollback cubre los errores explícitos.
 - [Borrar un usuario borraría sus tareas por el CASCADE] → Hoy no existe borrado de usuarios. Se anota para cuando exista.
 - [Gana la última escritura entre dos personas] → Aceptado. El refresco y los conflictos son E3-2 y PA-8.
-- [El cambio de portada a `/tasks` contradice la spec viva `auth` (en PR aparte), que dice «comodín → perfil»] → Al integrar ambas, actualizar ese requisito de `auth` con un delta MODIFIED o directamente en la spec viva.
+- [El cambio de portada a `/tasks` contradice la spec viva `auth`, que dice «comodín → perfil» y «login/registro → perfil»] → El change incluye un delta `specs/auth/spec.md` con `MODIFIED` para esos requisitos y para «Pantalla de perfil», que gana el enlace a la lista.
 
 ## Migration Plan
 

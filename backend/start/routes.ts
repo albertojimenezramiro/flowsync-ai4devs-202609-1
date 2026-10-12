@@ -33,5 +33,18 @@ router
       .prefix('account')
       .as('profile')
       .use(middleware.auth())
+
+    // Exactly three operations: no single-task read and no delete.
+    router
+      .group(() => {
+        router.get('/', [controllers.Tasks, 'index'])
+        router.post('/', [controllers.Tasks, 'store'])
+        router
+          .patch(':id', [controllers.Tasks, 'update'])
+          // Canonical positive integers only: rejects 1.0, -1 and leading zeros (01).
+          .where('id', { match: /^[1-9]\d*$/, cast: (value) => Number(value) })
+      })
+      .prefix('tasks')
+      .use(middleware.auth())
   })
   .prefix('/api/v1')
