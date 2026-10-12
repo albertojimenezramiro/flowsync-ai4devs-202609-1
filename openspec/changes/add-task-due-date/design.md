@@ -62,6 +62,7 @@ Para la motivación y el alcance, ver proposal.md. Para el contrato, ver `specs/
     - `IANAZone.isValidZone(tz)`, porque luxon por sí solo aceptaría desfases como `+02:00`.
   - Si no pasa, lanza `errors.E_VALIDATION_ERROR([{ field: 'X-Timezone', rule: 'timezone', message: 'The X-Timezone header must be a valid IANA time zone name' }])`, que da `422` con la forma habitual `{ errors }`.
   - Si es válida, devuelve `DateTime.now().setZone(tz).toISODate()`.
+  - El helper se importa como `#helpers/reference_date`. Para eso se añade el alias `"#helpers/*": "./app/helpers/*.js"` a `imports` en `backend/package.json`, siguiendo la convención de imports por subpath del proyecto.
   - Si llegan varias cabeceras, Node las une con comas y el resultado no pasa la forma, así que también da `422`.
 - **Se resuelve al principio de cada acción**, antes de validar el cuerpo o tocar la BD. Así, una zona inválida en `store` o `update` no aplica ningún cambio, como exige la spec.
 - **CORS**: `config/cors.ts` tiene `headers: true` y refleja las cabeceras pedidas, así que `X-Timezone` pasa el preflight sin cambios.
@@ -96,10 +97,10 @@ Para la motivación y el alcance, ver proposal.md. Para el contrato, ver `specs/
 - **`lib/api.ts`**:
   - `request()` añade siempre `X-Timezone: Intl.DateTimeFormat().resolvedOptions().timeZone`.
   - Funciones nuevas: `getTask(token, id)` y `updateTaskDueDate(token, id, dueDate: string | null)`.
-  - `FIELD_LABELS` gana `dueDate: 'la fecha de vencimiento'`.
+  - `FIELD_LABELS` gana `dueDate: 'la fecha de vencimiento'` y `'X-Timezone': 'la zona horaria del navegador'`. Así, un 422 de zona se traduce como «Revisa la zona horaria del navegador.» y no como el genérico «Revisa el campo.».
 - **Mensajes**: no se toca `translate()`. El panel no usa los mensajes genéricos, sino sus propios textos:
-  - Si `ApiError.fieldErrors.dueDate` existe, «Introduce una fecha completa y válida.».
-  - En cualquier otro error, «No se pudo guardar la fecha.» seguido de `error.message`.
+  - «Introduce una fecha completa y válida.» solo para lo que el panel detecta al confirmar, antes de enviar nada.
+  - Cualquier rechazo del servidor al guardar, incluido un 422 sobre `dueDate`, se muestra como «No se pudo guardar la fecha.» seguido de `error.message`, como exige la spec.
   - En la apertura, «No se pudo abrir la tarea.» seguido de `error.message`.
 - **Fila con panel** (`tasks-page.tsx`):
   - Cada fila añade un `Button` `variant="ghost"` «Abrir» / «Cerrar», con `aria-expanded` y `aria-controls` apuntando al panel. Es un botón nativo, así que funciona con teclado sin código extra.

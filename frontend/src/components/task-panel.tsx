@@ -93,9 +93,10 @@ export function TaskPanel({
     return () => {
       cancelled = true
     }
-    // Solo al abrir (el panel se monta de nuevo en cada apertura): las
-    // respuestas posteriores llegan por `onTask`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Dependencias vacías a propósito: solo se lee al abrir, y el panel se
+    // monta de nuevo en cada apertura (se desmonta al cerrar). Las respuestas
+    // posteriores llegan por `onTask`.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const save = async (dueDate: string | null) => {
@@ -113,11 +114,7 @@ export function TaskPanel({
         return
       }
       setDraft(saved)
-      setDateError(
-        error instanceof ApiError && error.fieldErrors.dueDate
-          ? INVALID_DATE
-          : saveError(error),
-      )
+      setDateError(saveError(error))
     } finally {
       if (mounted.current) setSaving(false)
     }

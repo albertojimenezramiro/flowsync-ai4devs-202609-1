@@ -339,6 +339,10 @@ El panel SHALL ofrecer un campo «Fecha de vencimiento» que, sin botón de guar
 - **WHEN** la persona borra el contenido del campo de una tarea con fecha y sale de él
 - **THEN** ve «Introduce una fecha completa y válida.», la fecha guardada se conserva y el campo vuelve a mostrarla
 
+#### Scenario: Fallo al guardar con la tarea cerrada
+- **WHEN** la persona escribe una fecha, pulsa «Cerrar» y el guardado falla en el servidor o por falta de conexión
+- **THEN** ve en la página «No se pudo guardar la fecha.» seguido del motivo, aunque el panel ya esté cerrado, y la tarea conserva su fecha anterior
+
 #### Scenario: Cualquier tarea
 - **WHEN** la persona cambia la fecha de una tarea cuyo responsable es otra persona
 - **THEN** el cambio se aplica sin avisos ni permisos especiales
