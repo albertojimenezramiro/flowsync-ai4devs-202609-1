@@ -57,13 +57,13 @@ export default class TasksController {
     required: false,
     enum: [...TASK_STATUSES],
     description:
-      'Acota la lista a un único estado. Hoy el servidor no rechaza un valor fuera de estos tres: responde 200 con una lista vacía.',
+      'Acota la lista a un único estado. Cualquier otro valor, incluido `?status=` vacío, se rechaza con 422.',
   })
   @ApiResponse({ status: 200, type: TaskListResponse, description: 'La lista; puede venir vacía.' })
   @ApiResponse({
     status: 422,
     type: ValidationError,
-    description: '`status` no es un único texto (por ejemplo, repetido en la query).',
+    description: '`status` no es ninguno de los tres estados, o viene repetido en la query.',
   })
   async index({ request, serialize }: HttpContext) {
     const { status } = await request.validateUsing(listTasksValidator)

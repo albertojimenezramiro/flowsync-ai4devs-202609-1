@@ -35,7 +35,7 @@ Las reglas se enumeran aquí solo por su nombre en la spec, con enlace, y con un
 
 **Lista**
 - [Una sola lista compartida del espacio](../../../openspec/specs/tasks/spec.md#requirement-una-sola-lista-compartida-del-espacio): `TasksController.index`. La vista por defecto es `DEFAULT_LIST_STATUSES` en `backend/app/models/task.ts`.
-- [Acotar la lista por estado](../../../openspec/specs/tasks/spec.md#requirement-acotar-la-lista-por-estado), [Un filtro válido sin resultados es una lista vacía legítima](../../../openspec/specs/tasks/spec.md#requirement-un-filtro-válido-sin-resultados-es-una-lista-vacía-legítima) y [Un estado que no existe se rechaza, no se responde vacío](../../../openspec/specs/tasks/spec.md#requirement-un-estado-que-no-existe-se-rechaza-no-se-responde-vacío): `listTasksValidator` y `TasksController.index`. Esta última regla tiene una desviación conocida, descrita en [Desviaciones conocidas](#desviaciones-conocidas).
+- [Acotar la lista por estado](../../../openspec/specs/tasks/spec.md#requirement-acotar-la-lista-por-estado), [Un filtro válido sin resultados es una lista vacía legítima](../../../openspec/specs/tasks/spec.md#requirement-un-filtro-válido-sin-resultados-es-una-lista-vacía-legítima) y [Un estado que no existe se rechaza, no se responde vacío](../../../openspec/specs/tasks/spec.md#requirement-un-estado-que-no-existe-se-rechaza-no-se-responde-vacío): `listTasksValidator` y `TasksController.index`.
 - [La lista no lleva el vencimiento](../../../openspec/specs/tasks/spec.md#requirement-la-lista-no-lleva-el-vencimiento): la lista usa `TaskTransformer`, que no incluye la fecha. La tarea suelta usa `TaskDetailTransformer`.
 - [Lo que cada tarea muestra de su responsable](../../../openspec/specs/tasks/spec.md#requirement-lo-que-cada-tarea-muestra-de-su-responsable): `TaskAssigneeTransformer`.
 
@@ -45,7 +45,7 @@ Las reglas se enumeran aquí solo por su nombre en la spec, con enlace, y con un
 
 **Vencimiento**
 - [Fecha de vencimiento opcional](../../../openspec/specs/tasks/spec.md#requirement-fecha-de-vencimiento-opcional) y [Fijar, cambiar y retirar la fecha de vencimiento](../../../openspec/specs/tasks/spec.md#requirement-fijar-cambiar-y-retirar-la-fecha-de-vencimiento): `TaskDueDatesController.update` y `setTaskDueDateValidator`.
-- [Cuándo una tarea está vencida](../../../openspec/specs/tasks/spec.md#requirement-cuándo-una-tarea-está-vencida): `Task.isOverdueOn()`. Es la única implementación de la regla, y hoy la incumple: ver [Desviaciones conocidas](#desviaciones-conocidas). El frontend nunca compara fechas.
+- [Cuándo una tarea está vencida](../../../openspec/specs/tasks/spec.md#requirement-cuándo-una-tarea-está-vencida): `Task.isOverdueOn()`. Es la única implementación de la regla. El frontend nunca compara fechas.
 - [El día de referencia lo pone quien mira](../../../openspec/specs/tasks/spec.md#requirement-el-día-de-referencia-lo-pone-quien-mira): `taskReferenceDayValidator` y `setTaskDueDateValidator`. En el frontend, `localToday()` de `frontend/src/lib/api.ts`.
 - [Consulta de una tarea suelta](../../../openspec/specs/tasks/spec.md#requirement-consulta-de-una-tarea-suelta): `TasksController.show`.
 
@@ -71,13 +71,6 @@ Las reglas se enumeran aquí solo por su nombre en la spec, con enlace, y con un
 
 Toda llamada a la API pasa por `frontend/src/lib/api.ts`.
 
-### Desviaciones conocidas
-
-Cuando se corrija cada una, bórrala de aquí y ajusta el esquema correspondiente de `backend/app/openapi/schemas.ts`, que hoy describe lo que hace el código.
-
-- **Estados inventados.** Desde el commit `8c15707`, `listTasksValidator` acepta `status` como texto libre, cuando debería limitarlo a uno de los tres estados. Por eso `GET /api/v1/tasks?status=archivado` responde `200` con `{"data":[]}` en vez del `422` que exige [Un estado que no existe se rechaza, no se responde vacío](../../../openspec/specs/tasks/spec.md#requirement-un-estado-que-no-existe-se-rechaza-no-se-responde-vacío). Para comprobar si sigue ocurriendo, mira el último ejemplo de [A mano, contra la API](#a-mano-contra-la-api).
-- **Tareas hechas que salen vencidas.** Desde el commit `99d1425`, `Task.isOverdueOn()` solo comprueba que haya fecha y que sea anterior a `today`, sin mirar el estado. Una tarea en `done` con fecha pasada llega con `isOverdue: true`, contra los scenarios *Una tarea hecha con la fecha pasada* y *Darla por hecha la deja de vencer* de [Cuándo una tarea está vencida](../../../openspec/specs/tasks/spec.md#requirement-cuándo-una-tarea-está-vencida).
-
 ## Cómo se prueba en local
 
 ### Arrancar
@@ -96,10 +89,16 @@ Sin `make`, haz los mismos pasos a mano tal como los describe el `CLAUDE.md` de 
 ```bash
 cd backend
 npm test                                # todas las suites
-node ace test --files=tasks/assignee    # solo los tests de tareas
+node ace test --files=tasks/           # solo los tests de tareas
 ```
 
-Hoy la capability tiene un único fichero de tests, `backend/tests/functional/tasks/assignee.spec.ts`. Cubre solo el requisito *Lo que cada tarea muestra de su responsable*. El resto de requisitos no tiene test automático.
+Los tests de la capability están en `backend/tests/functional/tasks/` y hoy cubren tres requisitos:
+
+- `assignee.spec.ts`: *Lo que cada tarea muestra de su responsable*.
+- `overdue.spec.ts`: *Cuándo una tarea está vencida*, en los scenarios de una tarea hecha.
+- `status_filter.spec.ts`: *Un estado que no existe se rechaza, no se responde vacío*.
+
+El resto de requisitos no tiene test automático.
 
 Los tests functional usan la misma base de datos SQLite que el servidor de desarrollo, `backend/tmp/db.sqlite3`. Los de tareas se aíslan con `testUtils.db().withGlobalTransaction()` en `group.each.setup`. Cualquier test nuevo que escriba datos tiene que hacer lo mismo.
 
@@ -119,7 +118,7 @@ curl -s -H "$AUTH" "$API/tasks"
 curl -s -H "$AUTH" "$API/tasks/1?today=$(date +%F)"
 curl -s -H "$AUTH" -H 'Content-Type: application/json' -X PATCH $API/tasks/1/status -d '{"status":"in_progress"}'
 curl -s -H "$AUTH" -H 'Content-Type: application/json' -X PUT $API/tasks/1/due-date -d "{\"dueDate\":\"2026-09-30\",\"today\":\"$(date +%F)\"}"
-curl -s -o /dev/null -w '%{http_code}\n' -H "$AUTH" "$API/tasks?status=archivado"   # la spec exige 422
+curl -s -o /dev/null -w '%{http_code}\n' -H "$AUTH" "$API/tasks?status=archivado"   # 422: el estado no existe
 ```
 
 También se pueden lanzar las peticiones desde la interfaz OpenAPI en <http://localhost:3333/api>. Desde el navegador, la lista está en <http://localhost:5173/tasks>.
