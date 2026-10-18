@@ -22,7 +22,7 @@ FlowSync necesita un sitio donde conste qué debe hacer el sistema, separado de 
   - `add-task-due-date` añade 11 requisitos y modifica 1.
   - `add-task-status-filter` añade 7 requisitos y modifica 4.
   - Los 14 + 11 + 7 requisitos añadidos son exactamente los 32 que tiene hoy `openspec/specs/tasks/spec.md`.
-- La capability `auth` no tiene change de origen archivado. Su línea base se escribió directamente en `specs/` (commit `04940fc`), y solo `add-task-list` la ha modificado desde entonces.
+- La capability `auth` no tiene change de origen archivado. Su spec aparece ya completa en el commit `04940fc`, el mismo que archiva `add-task-list`, que la modifica, así que el historial no deja ver una línea base de `auth` anterior a ese change.
 
 Hay dos episodios que muestran qué pasa cuando el código y la spec se separan.
 
