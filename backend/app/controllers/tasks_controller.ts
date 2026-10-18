@@ -1,4 +1,4 @@
-import Task, { DEFAULT_LIST_STATUSES } from '#models/task'
+import Task, { DEFAULT_LIST_STATUSES, TASK_STATUSES } from '#models/task'
 import {
   createTaskValidator,
   listTasksValidator,
@@ -8,7 +8,29 @@ import {
 import type { HttpContext } from '@adonisjs/core/http'
 import TaskTransformer from '#transformers/task_transformer'
 import TaskDetailTransformer from '#transformers/task_detail_transformer'
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+} from '@foadonis/openapi/decorators'
+import {
+  CreateTaskBody,
+  NotFoundError,
+  TaskDetailResponse,
+  TaskListResponse,
+  TaskResponse,
+  UnauthorizedError,
+  ValidationError,
+} from '#openapi/schemas'
 
+@ApiBearerAuth()
+@ApiResponse({
+  status: 401,
+  type: UnauthorizedError,
+  description: 'Falta el token o no es válido.',
+})
 export default class TasksController {
   /**
    * La lista del espacio: una sola, la misma para todo el mundo, sin filtrar
@@ -25,6 +47,24 @@ export default class TasksController {
    *
    * Acotar es solo lectura: ninguna tarea cambia por consultarla.
    */
+  @ApiOperation({
+    summary: 'Lista compartida de tareas',
+    description:
+      'La misma lista para cualquier cuenta, de la más reciente a la más antigua y sin paginar. Sin `status` devuelve las pendientes y en curso, nunca las hechas.',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: [...TASK_STATUSES],
+    description:
+      'Acota la lista a un único estado. Hoy el servidor no rechaza un valor fuera de estos tres: responde 200 con una lista vacía.',
+  })
+  @ApiResponse({ status: 200, type: TaskListResponse, description: 'La lista; puede venir vacía.' })
+  @ApiResponse({
+    status: 422,
+    type: ValidationError,
+    description: '`status` no es un único texto (por ejemplo, repetido en la query).',
+  })
   async index({ request, serialize }: HttpContext) {
     const { status } = await request.validateUsing(listTasksValidator)
 
@@ -51,6 +91,24 @@ export default class TasksController {
    * Una tarea suelta, con todo lo que tiene: es la única lectura que informa
    * del vencimiento, y por eso es la única que exige el día de quien mira.
    */
+  @ApiOperation({
+    summary: 'Una tarea, con su vencimiento',
+    description: 'Resuelve `isOverdue` contra el día que indica quien pide en `today`.',
+  })
+  @ApiQuery({
+    name: 'today',
+    required: true,
+    schema: { type: 'string', format: 'date' },
+    description:
+      'Día de referencia de quien pide (AAAA-MM-DD). No se sustituye por el del servidor.',
+  })
+  @ApiResponse({ status: 200, type: TaskDetailResponse })
+  @ApiResponse({ status: 404, type: NotFoundError, description: 'La tarea no existe.' })
+  @ApiResponse({
+    status: 422,
+    type: ValidationError,
+    description: 'Falta `today` o no es un día válido.',
+  })
   async show({ params, request, serialize }: HttpContext) {
     const { today } = await request.validateUsing(taskReferenceDayValidator)
     const task = await Task.findOrFail(params.id)
@@ -63,6 +121,17 @@ export default class TasksController {
    * Crear cuesta un título. El responsable y el estado no se leen de la
    * petición ni aunque vengan: los pone el sistema.
    */
+  @ApiOperation({
+    summary: 'Crear una tarea con solo el título',
+    description: 'Nace pendiente, sin fecha y a nombre de la cuenta dueña del token.',
+  })
+  @ApiBody({ type: CreateTaskBody, required: true })
+  @ApiResponse({ status: 201, type: TaskResponse, description: 'La tarea creada.' })
+  @ApiResponse({
+    status: 422,
+    type: ValidationError,
+    description: 'Título ausente, vacío, de solo espacios o de más de 200 caracteres.',
+  })
   async store({ request, response, auth, serialize }: HttpContext) {
     const { title } = await request.validateUsing(createTaskValidator)
     const user = auth.getUserOrFail()
