@@ -71,7 +71,7 @@ export class TaskDetail extends Task {
   @ApiProperty({
     type: 'boolean',
     description:
-      'Hoy: tiene fecha y esa fecha es anterior al día de referencia (`today`). No mira el estado, así que una tarea hecha con fecha pasada llega vencida; la spec exige además que no esté hecha.',
+      'Tiene fecha, esa fecha es anterior al día de referencia (`today`) y no está hecha.',
   })
   declare isOverdue: boolean
 }
