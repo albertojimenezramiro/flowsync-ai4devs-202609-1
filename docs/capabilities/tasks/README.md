@@ -89,7 +89,7 @@ Sin `make`, haz los mismos pasos a mano tal como los describe el `CLAUDE.md` de 
 ```bash
 cd backend
 npm test                                # todas las suites
-node ace test --files=tasks/             # solo los tests de tareas
+node ace test --files=tasks/           # solo los tests de tareas
 ```
 
 Los tests de la capability están en `backend/tests/functional/tasks/` y hoy cubren tres requisitos:

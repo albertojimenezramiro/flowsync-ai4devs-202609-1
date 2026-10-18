@@ -56,7 +56,8 @@ export default class TasksController {
     name: 'status',
     required: false,
     enum: [...TASK_STATUSES],
-    description: 'Acota la lista a un único estado. Cualquier otro valor se rechaza con 422.',
+    description:
+      'Acota la lista a un único estado. Cualquier otro valor, incluido `?status=` vacío, se rechaza con 422.',
   })
   @ApiResponse({ status: 200, type: TaskListResponse, description: 'La lista; puede venir vacía.' })
   @ApiResponse({

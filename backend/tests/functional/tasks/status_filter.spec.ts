@@ -30,5 +30,12 @@ test.group('Tasks | filtro por estado', (group) => {
     response.assertStatus(422)
     response.assertBodyContains({ errors: [{ field: 'status' }] })
     assert.notProperty(response.body(), 'data', 'no se devuelve ninguna lista')
+
+    // La otra mitad del contraste: un estado válido sin tareas es un 200 con
+    // lista vacía, y las dos respuestas se distinguen sin ambigüedad.
+    const vacia = await client.get('/api/v1/tasks').qs({ status: 'in_progress' }).loginAs(ada)
+
+    vacia.assertStatus(200)
+    assert.deepEqual(vacia.body(), { data: [] })
   })
 })
