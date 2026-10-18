@@ -2,8 +2,6 @@
 
 ## Estado
 
-Reemplazado el 2027-10-18 por [ADR 0002: Los tests de integración como única fuente de verdad ejecutable](0002-tests-como-fuente-de-verdad-ejecutable.md). El resto de este documento se conserva tal como se aceptó.
-
 Aceptado. Fecha de este registro: 2026-10-18.
 
 El ADR pone por escrito una práctica que el repositorio sigue desde el 2026-08-13, fecha de los tres changes archivados. No abre una decisión nueva.

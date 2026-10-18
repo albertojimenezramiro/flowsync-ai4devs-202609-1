@@ -2,7 +2,9 @@
 
 ## Estado
 
-Aceptado el 2027-10-18. Reemplaza a [ADR 0001: Las delta-specs de OpenSpec como fuente de verdad viva](0001-openspec-como-fuente-de-verdad.md).
+Propuesto. Fecha de este registro: 2026-10-18.
+
+Es un escenario hipotético: dentro de un año se dejan de mantener las specs de OpenSpec. No está aceptado. La decisión vigente sigue siendo el [ADR 0001: Las delta-specs de OpenSpec como fuente de verdad viva](0001-openspec-como-fuente-de-verdad.md). Si este ADR se aceptara, reemplazaría al 0001, y habría que marcarlo así en el estado del 0001.
 
 ## Contexto
 
