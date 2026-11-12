@@ -1,32 +1,54 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Idioma: los artefactos se escriben en castellano; los títulos estructurales de
+  OpenSpec y las palabras SHALL/MUST se mantienen en inglés.
+  Fuente de verdad del comportamiento: las specs vivas de openspec/specs/
+  (ADR 0001 en docs/adr/). Solo cambian a través de un change.
+  Origen de los changes: las historias de docs/backlog/<épica>/. Los criterios
+  marcados [PROPUESTO] no están validados con producto.
+  Alcance de producto: docs/prd/alcance-mvp.md prevalece sobre el PRD. No se
+  proponen cosas que excluye: notificaciones, presencia, permisos o roles,
+  comentarios, etiquetas, búsqueda, histórico, estados configurables. Los roles
+  son planos: cualquier persona edita cualquier tarea.
+  Los puntos abiertos del PRD (PA-n) no se cierran sin acuerdo explícito.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+rules:
+  proposal:
+    - Cita la historia de origen (ruta) y, si existen, sus tickets.
+    - Si cierras un punto abierto del PRD (PA-n), indica cuál y quién lo acordó;
+      si no está acordado, pregunta antes de escribir.
+    - Comprueba si el cambio altera requisitos de otras capabilities (por
+      ejemplo, auth) y lístalas en Modified Capabilities.
+  specs:
+    - Cada criterio de aceptación de la historia es al menos un escenario.
+    - No añadas comportamientos que no estén en los criterios; pregunta.
+    - Los criterios [PROPUESTO] solo entran si se han validado; si no, pregunta.
+    - La API HTTP es contrato, porque la consume la SPA. Los escenarios de API
+      pueden nombrar ruta, cuerpo y código de respuesta. Los de interfaz
+      describen lo que la persona ve y hace, sin nombrar componentes.
+  design:
+    - Respeta los ADR de docs/adr/; si una decisión los contradice, dilo y
+      justifícalo.
+    - Una dependencia nueva es una decisión con alternativas y aparece en el
+      Impact del proposal.
+  tasks:
+    - Si la historia tiene tickets, un grupo por ticket con su id en el título,
+      en el orden acordado.
+    - Cada grupo que cambia el backend incluye sus tests functional de Japa,
+      aislando la base con testUtils.db(). El frontend no tiene runner de
+      tests; su verificación es npm run build más una comprobación manual
+      descrita en la tarea.
+    - Incluye, en el grupo que corresponda, lo que exigen las «Reglas de
+      proceso» de CLAUDE.md (OpenAPI y README de la capability).
 
-# Per-operation guidance (optional)
-# Add advisory guidance for how apply and archive work should be conducted.
-# This is separate from artifact rules above.
-# Example:
-#   operations:
-#     apply:
-#       guidance:
-#         - Keep test summaries concise
-#     archive:
-#       guidance:
-#         - Summarize the archive outcome before finishing
+operations:
+  apply:
+    guidance:
+      - Pasa los tests del backend al terminar cada grupo, no solo al final.
+      - Si el diseño no encaja con el código, para y propón un /opsx:update en
+        lugar de improvisar.
+  archive:
+    guidance:
+      - Antes de archivar, confirma que se ha pasado /opsx:verify y resume qué
+        requisitos de la spec viva cambian.
